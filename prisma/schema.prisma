@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          String         @default("BRAND") // SUPER_ADMIN, ADMIN, OPERATIONS, FINANCE, BRAND
+  brand         Brand?
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Brand {
+  id           String          @id @default(cuid())
+  userId       String          @unique
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandName    String
+  category     String          // Girl's Fashion, Unisex Fashion, Accessories, etc.
+  aboutBrand   String?
+  products     String?
+  instagram    String?
+  facebook     String?
+  tiktok       String?
+  website      String?
+  otherSocial  String?
+  contactName  String
+  contactEmail String
+  contactPhone String
+  taxId        String?
+  nationalId   String?
+  documents    BrandDocument[]
+  applications Application[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model BrandDocument {
+  id           String   @id @default(cuid())
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  documentType String   // TAX_ID_CARD, NATIONAL_ID, COMMERCIAL_REG
+  fileUrl      String
+  fileName     String
+  fileSize     Int      @default(0)
+  status       String   @default("UPLOADED") // UPLOADED, UNDER_REVIEW, APPROVED, REJECTED
+  uploadedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Event {
+  id                  String          @id @default(cuid())
+  name                String
+  slug                String          @unique
+  description         String
+  highlights          String?         // JSON array or bullets
+  coverImage          String
+  location            String
+  googleMapsUrl       String?
+  startDate           DateTime
+  endDate             DateTime
+  startTime           String          @default("11:00 AM")
+  endTime             String          @default("11:00 PM")
+  regOpenDate         DateTime
+  regCloseDate        DateTime
+  status              String          @default("REGISTRATION_OPEN") // DRAFT, UPCOMING, REGISTRATION_OPEN, REGISTRATION_CLOSED, COMPLETED, CANCELLED
+  capacity            Int             @default(100)
+  termsAndConditions  String
+  tcVersion           String          @default("1.0")
+  paymentInstructions String?
+  bankName            String          @default("CIB")
+  accountName         String          @default("BAZARNA SOCIETY")
+  accountNumber       String          @default("100075173867")
+  instapayHandle      String?         @default("bazarnasociety@cib")
+  packages            EventPackage[]
+  questions           EventQuestion[]
+  applications        Application[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+}
+
+model EventPackage {
+  id            String        @id @default(cuid())
+  eventId       String
+  event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  price         Float
+  description   String
+  includedItems String        // "2 Chairs, 170cm Table, Electricity Plug"
+  image         String?
+  totalQty      Int           @default(30)
+  remainingQty  Int           @default(30)
+  isActive      Boolean       @default(true)
+  applications  Application[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model EventQuestion {
+  id           String              @id @default(cuid())
+  eventId      String
+  event        Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  questionText String
+  questionType String              // NUMBER, YES_NO, TEXT, FILE
+  isRequired   Boolean             @default(false)
+  orderIndex   Int                 @default(0)
+  answers      ApplicationAnswer[]
+}
+
+model Application {
+  id              String              @id @default(cuid())
+  applicationCode String              @unique // e.g. "BY-2026-000123"
+  brandId         String
+  brand           Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  eventId         String
+  event           Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  packageId       String
+  package         EventPackage        @relation(fields: [packageId], references: [id])
+  prParticipation Boolean             @default(false)
+  notes           String?
+  assignedBooth   String?             // e.g. "Booth B-14"
+  appStatus       String              @default("SUBMITTED") // DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CHANGES_REQUESTED
+  paymentStatus   String              @default("PENDING") // PENDING, RECEIPT_UPLOADED, UNDER_REVIEW, PAID, REJECTED
+  tcAccepted      Boolean             @default(true)
+  tcAcceptedAt    DateTime            @default(now())
+  tcVersion       String              @default("1.0")
+  payment         Payment?
+  answers         ApplicationAnswer[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model Payment {
+  id              String       @id @default(cuid())
+  applicationId   String       @unique
+  application     Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  amount          Float
+  currency        String       @default("EGP")
+  method          String       @default("BANK_TRANSFER") // BANK_TRANSFER, INSTAPAY
+  receiptFileUrl  String?
+  receiptFileName String?
+  paymentStatus   String       @default("PENDING") // PENDING, RECEIPT_UPLOADED, UNDER_REVIEW, PAID, REJECTED
+  adminNote       String?
+  uploadedAt      DateTime?
+  verifiedAt      DateTime?
+  updatedAt       DateTime     @updatedAt
+}
+
+model ApplicationAnswer {
+  id            String        @id @default(cuid())
+  applicationId String
+  application   Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerText    String
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // APPLICATION_SUBMITTED, APPLICATION_APPROVED, etc.
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminName  String
+  action     String   // e.g. "Approved Application BY-2026-000123"
+  targetType String   // APPLICATION, EVENT, PAYMENT, BRAND
+  targetId   String
+  details    String?  // JSON or text
+  timestamp  DateTime @default(now())
+}
