@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String         @id @default(cuid())
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
   email         String         @unique
   passwordHash  String
   name          String
@@ -22,8 +22,8 @@ model User {
 }
 
 model Brand {
-  id           String          @id @default(cuid())
-  userId       String          @unique
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String          @unique @db.ObjectId
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   brandName    String
   category     String          // Girl's Fashion, Unisex Fashion, Accessories, etc.
@@ -46,8 +46,8 @@ model Brand {
 }
 
 model BrandDocument {
-  id           String   @id @default(cuid())
-  brandId      String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  brandId      String   @db.ObjectId
   brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   documentType String   // TAX_ID_CARD, NATIONAL_ID, COMMERCIAL_REG
   fileUrl      String
@@ -59,7 +59,7 @@ model BrandDocument {
 }
 
 model Event {
-  id                  String          @id @default(cuid())
+  id                  String          @id @default(auto()) @map("_id") @db.ObjectId
   name                String
   slug                String          @unique
   description         String
@@ -90,8 +90,8 @@ model Event {
 }
 
 model EventPackage {
-  id            String        @id @default(cuid())
-  eventId       String
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  eventId       String        @db.ObjectId
   event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   name          String
   price         Float
@@ -107,8 +107,8 @@ model EventPackage {
 }
 
 model EventQuestion {
-  id           String              @id @default(cuid())
-  eventId      String
+  id           String              @id @default(auto()) @map("_id") @db.ObjectId
+  eventId      String              @db.ObjectId
   event        Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
   questionText String
   questionType String              // NUMBER, YES_NO, TEXT, FILE
@@ -118,13 +118,13 @@ model EventQuestion {
 }
 
 model Application {
-  id              String              @id @default(cuid())
+  id              String              @id @default(auto()) @map("_id") @db.ObjectId
   applicationCode String              @unique // e.g. "BY-2026-000123"
-  brandId         String
+  brandId         String              @db.ObjectId
   brand           Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  eventId         String
+  eventId         String              @db.ObjectId
   event           Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  packageId       String
+  packageId       String              @db.ObjectId
   package         EventPackage        @relation(fields: [packageId], references: [id])
   prParticipation Boolean             @default(false)
   notes           String?
@@ -141,8 +141,8 @@ model Application {
 }
 
 model Payment {
-  id              String       @id @default(cuid())
-  applicationId   String       @unique
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  applicationId   String       @unique @db.ObjectId
   application     Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   amount          Float
   currency        String       @default("EGP")
@@ -157,17 +157,17 @@ model Payment {
 }
 
 model ApplicationAnswer {
-  id            String        @id @default(cuid())
-  applicationId String
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  applicationId String        @db.ObjectId
   application   Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  questionId    String
+  questionId    String        @db.ObjectId
   question      EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   answerText    String
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
@@ -178,8 +178,8 @@ model Notification {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?  @db.ObjectId
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminName  String
   action     String   // e.g. "Approved Application BY-2026-000123"
