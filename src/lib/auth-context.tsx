@@ -70,18 +70,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const authenticatedUser = BazarnaStore.authenticate(email, password);
-    if (!authenticatedUser) {
-      return { success: false, error: "Invalid email or password. Please try again." };
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        const authenticatedUser = data.user;
+        setUser(authenticatedUser);
+        setRoleState(authenticatedUser.role);
+        BazarnaStore.setCurrentUser(authenticatedUser);
+        if (authenticatedUser.brand) {
+          setCurrentBrandState(authenticatedUser.brand);
+          BazarnaStore.setCurrentBrand(authenticatedUser.brand.id);
+        }
+        addToast("success", "Welcome back!", `Logged in as ${authenticatedUser.name}`);
+        return { success: true, user: authenticatedUser };
+      }
+      return { success: false, error: data.error || "Invalid email or password." };
+    } catch (err) {
+      // Local fallback
+      const authenticatedUser = BazarnaStore.authenticate(email, password);
+      if (!authenticatedUser) {
+        return { success: false, error: "Invalid email or password. Please try again." };
+      }
+      setUser(authenticatedUser);
+      setRoleState(authenticatedUser.role);
+      if (authenticatedUser.brandId) {
+        const brand = BazarnaStore.getBrandById(authenticatedUser.brandId);
+        if (brand) setCurrentBrandState(brand);
+      }
+      addToast("success", "Welcome back!", `Logged in as ${authenticatedUser.name}`);
+      return { success: true, user: authenticatedUser };
     }
-    setUser(authenticatedUser);
-    setRoleState(authenticatedUser.role);
-    if (authenticatedUser.brandId) {
-      const brand = BazarnaStore.getBrandById(authenticatedUser.brandId);
-      if (brand) setCurrentBrandState(brand);
-    }
-    addToast("success", "Welcome back!", `Logged in as ${authenticatedUser.name}`);
-    return { success: true, user: authenticatedUser };
   };
 
   const register = async (params: {
@@ -92,19 +115,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string;
     contactPhone: string;
   }) => {
-    // Check if email already in use
-    const existingUsers = BazarnaStore.getUsers();
-    if (existingUsers.some((u) => u.email.toLowerCase() === params.email.toLowerCase().trim())) {
-      return { success: false, error: "An account with this email already exists." };
-    }
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        const newUser = data.user;
+        setUser(newUser);
+        setRoleState(newUser.role);
+        BazarnaStore.setCurrentUser(newUser);
+        if (newUser.brand) {
+          setCurrentBrandState(newUser.brand);
+          BazarnaStore.setCurrentBrand(newUser.brand.id);
+        }
+        setAvailableBrands(BazarnaStore.getBrands());
+        addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${params.brandName}!`);
+        return { success: true, user: newUser };
+      }
+      return { success: false, error: data.error || "Failed to create account." };
+    } catch (err) {
+      // Local fallback
+      const existingUsers = BazarnaStore.getUsers();
+      if (existingUsers.some((u) => u.email.toLowerCase() === params.email.toLowerCase().trim())) {
+        return { success: false, error: "An account with this email already exists." };
+      }
 
-    const { user: newUser, brand: newBrand } = BazarnaStore.registerBrand(params);
-    setUser(newUser);
-    setRoleState(newUser.role);
-    setCurrentBrandState(newBrand);
-    setAvailableBrands(BazarnaStore.getBrands());
-    addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${newBrand.brandName}!`);
-    return { success: true, user: newUser };
+      const { user: newUser, brand: newBrand } = BazarnaStore.registerBrand(params);
+      setUser(newUser);
+      setRoleState(newUser.role);
+      setCurrentBrandState(newBrand);
+      setAvailableBrands(BazarnaStore.getBrands());
+      addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${newBrand.brandName}!`);
+      return { success: true, user: newUser };
+    }
   };
 
   const logout = () => {

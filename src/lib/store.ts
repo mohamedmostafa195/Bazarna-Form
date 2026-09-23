@@ -78,7 +78,63 @@ function setStored<T>(key: string, data: T): void {
   }
 }
 
+// Background sync with MongoDB Atlas
+async function syncWithServer(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    // 1. Sync events from MongoDB
+    const eventsRes = await fetch("/api/events");
+    if (eventsRes.ok) {
+      const data = await eventsRes.json();
+      if (data.success && Array.isArray(data.events) && data.events.length > 0) {
+        setStored(STORAGE_KEYS.EVENTS, data.events);
+      }
+    }
+
+    // 2. Sync applications from MongoDB
+    const appsRes = await fetch("/api/applications");
+    if (appsRes.ok) {
+      const data = await appsRes.json();
+      if (data.success && Array.isArray(data.applications)) {
+        setStored(STORAGE_KEYS.APPLICATIONS, data.applications);
+      }
+    }
+
+    // 3. Sync brands from MongoDB
+    const brandsRes = await fetch("/api/brands");
+    if (brandsRes.ok) {
+      const data = await brandsRes.json();
+      if (data.success && Array.isArray(data.brands) && data.brands.length > 0) {
+        setStored(STORAGE_KEYS.BRANDS, data.brands);
+      }
+    }
+
+    // 4. Sync audit logs from MongoDB
+    const logsRes = await fetch("/api/audit-logs");
+    if (logsRes.ok) {
+      const data = await logsRes.json();
+      if (data.success && Array.isArray(data.logs) && data.logs.length > 0) {
+        setStored(STORAGE_KEYS.AUDIT_LOGS, data.logs);
+      }
+    }
+  } catch (err) {
+    console.warn("MongoDB sync: using local cache", err);
+  }
+}
+
+// Auto-run sync on client load
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    syncWithServer();
+  }, 100);
+}
+
 export const BazarnaStore = {
+  // Manual sync trigger
+  async syncWithServer(): Promise<void> {
+    await syncWithServer();
+  },
+
   // --- EVENTS ---
   getEvents(): BazarnaEvent[] {
     const rawEvents = getStored<BazarnaEvent[]>(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
@@ -87,7 +143,7 @@ export const BazarnaStore = {
       let evtModified = false;
       let newSlug = evt.slug;
 
-      // Auto-sanitize corrupted slugs (e.g. if someone pasted an Instagram URL or external link)
+      // Auto-sanitize corrupted slugs
       if (
         !evt.slug ||
         evt.slug.includes("http") ||
@@ -138,18 +194,16 @@ export const BazarnaStore = {
         eSlug === decodedSlug ||
         e.id === decodedSlug ||
         decodedSlug.includes(eSlug) ||
-        (eSlug.length > 3 && decodedSlug.endsWith(eSlug))
+        (eSlug.length > 5 && decodedSlug.includes(eSlug.slice(0, 10)))
       );
     });
   },
 
   getEventById(id: string): BazarnaEvent | undefined {
-    const events = this.getEvents();
-    return events.find((e) => e.id === id);
+    return this.getEvents().find((e) => e.id === id);
   },
 
   saveEvent(event: BazarnaEvent): void {
-    // Ensure slug is clean and valid URL-friendly string (not a full URL)
     const cleanSlug = (event.slug || event.name)
       .replace(/^https?:\/\/[^\/]+\/?/i, "")
       .toLowerCase()
@@ -172,6 +226,18 @@ export const BazarnaStore = {
       event.id,
       `Event status: ${event.status}`
     );
+
+    // Persist to MongoDB Atlas
+    if (typeof window !== "undefined") {
+      const isExisting = event.id && event.id.length === 24;
+      const url = isExisting ? `/api/events/${event.id}` : "/api/events";
+      const method = isExisting ? "PUT" : "POST";
+      fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      }).catch((err) => console.error("Error saving event to MongoDB:", err));
+    }
   },
 
   deleteEvent(id: string): boolean {
@@ -188,6 +254,14 @@ export const BazarnaStore = {
       event.id,
       `Event ${event.name} (${event.id}) was permanently deleted`
     );
+
+    // Delete in MongoDB Atlas
+    if (typeof window !== "undefined" && id.length === 24) {
+      fetch(`/api/events/${id}`, { method: "DELETE" }).catch((err) =>
+        console.error("Error deleting event in MongoDB:", err)
+      );
+    }
+
     return true;
   },
 
@@ -196,10 +270,11 @@ export const BazarnaStore = {
     if (!original) return null;
 
     const baseName = newName || `${original.name} (Copy)`;
-    const newSlug = baseName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") + `-${Date.now().toString().slice(-4)}`;
+    const newSlug =
+      baseName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") + `-${Date.now().toString().slice(-4)}`;
 
     const newEvent: BazarnaEvent = {
       ...original,
@@ -242,6 +317,14 @@ export const BazarnaStore = {
         "EVENT",
         event.id
       );
+
+      if (typeof window !== "undefined" && eventId.length === 24) {
+        fetch(`/api/events/${eventId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        }).catch((err) => console.error("Error updating event status in MongoDB:", err));
+      }
     }
   },
 
@@ -274,6 +357,15 @@ export const BazarnaStore = {
       brands.push({ ...brand, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }
     setStored(STORAGE_KEYS.BRANDS, brands);
+
+    // Persist to MongoDB Atlas
+    if (typeof window !== "undefined" && brand.id && brand.id.length === 24) {
+      fetch(`/api/brands/${brand.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(brand),
+      }).catch((err) => console.error("Error saving brand to MongoDB:", err));
+    }
   },
 
   // --- APPLICATIONS ---
@@ -305,11 +397,10 @@ export const BazarnaStore = {
     const applications = this.getApplications();
     const selectedPackage = data.event.packages.find((p) => p.id === data.packageId);
 
-    // Generate clean application code, e.g. BY-2026-000127
     const seq = (applications.length + 124).toString().padStart(6, "0");
     const appCode = `BY-2026-${seq}`;
 
-    // Decrement package quantity if available
+    // Decrement package quantity
     const events = this.getEvents();
     const ev = events.find((e) => e.id === data.event.id);
     if (ev) {
@@ -360,10 +451,8 @@ export const BazarnaStore = {
     applications.unshift(newApp);
     setStored(STORAGE_KEYS.APPLICATIONS, applications);
 
-    // Save/update brand profile if modified during application
     this.saveBrand(data.brand);
 
-    // Log action
     this.addAuditLog(
       data.brand.contactName || data.brand.brandName,
       `Submitted Application ${appCode} for ${data.event.name}`,
@@ -371,6 +460,40 @@ export const BazarnaStore = {
       newApp.id,
       `Package: ${selectedPackage?.name} (${selectedPackage?.price} EGP)`
     );
+
+    // Asynchronously push to MongoDB Atlas
+    if (typeof window !== "undefined") {
+      fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandId: data.brand.id,
+          eventId: data.event.id,
+          packageId: data.packageId,
+          prParticipation: data.prParticipation,
+          notes: data.notes,
+          paymentMethod: data.paymentMethod,
+          receiptFileUrl: data.receiptFileUrl,
+          receiptFileName: data.receiptFileName,
+          answers: data.answers,
+          tcAccepted: data.tcAccepted,
+          tcVersion: data.tcVersion,
+        }),
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.success && result.application) {
+            // Update local ID with MongoDB ObjectId
+            const apps = getStored<EventApplication[]>(STORAGE_KEYS.APPLICATIONS, []);
+            const idx = apps.findIndex((a) => a.applicationCode === appCode);
+            if (idx >= 0) {
+              apps[idx].id = result.application.id;
+              setStored(STORAGE_KEYS.APPLICATIONS, apps);
+            }
+          }
+        })
+        .catch((err) => console.error("Error pushing application to MongoDB:", err));
+    }
 
     return newApp;
   },
@@ -398,6 +521,19 @@ export const BazarnaStore = {
         app.id,
         reason || `Status updated to ${status}`
       );
+
+      // Persist to MongoDB Atlas
+      if (typeof window !== "undefined") {
+        fetch(`/api/applications/${appId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            appStatus: status,
+            adminName,
+            adminNote: reason,
+          }),
+        }).catch((err) => console.error("Error updating application in MongoDB:", err));
+      }
     }
   },
 
@@ -426,6 +562,19 @@ export const BazarnaStore = {
         app.id,
         adminNote || `Payment updated to ${status}`
       );
+
+      // Persist to MongoDB Atlas
+      if (typeof window !== "undefined") {
+        fetch(`/api/applications/${appId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentStatus: status,
+            adminName,
+            adminNote,
+          }),
+        }).catch((err) => console.error("Error updating payment in MongoDB:", err));
+      }
     }
   },
 
@@ -443,6 +592,18 @@ export const BazarnaStore = {
         "APPLICATION",
         app.id
       );
+
+      // Persist to MongoDB Atlas
+      if (typeof window !== "undefined") {
+        fetch(`/api/applications/${appId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assignedBooth: boothName,
+            adminName,
+          }),
+        }).catch((err) => console.error("Error assigning booth in MongoDB:", err));
+      }
     }
   },
 
@@ -469,6 +630,15 @@ export const BazarnaStore = {
       timestamp: new Date().toISOString(),
     });
     setStored(STORAGE_KEYS.AUDIT_LOGS, logs);
+
+    // Persist to MongoDB Atlas
+    if (typeof window !== "undefined") {
+      fetch("/api/audit-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminName, action, targetType, targetId, details }),
+      }).catch((err) => console.error("Error creating audit log in MongoDB:", err));
+    }
   },
 
   // --- USERS & AUTHENTICATION ---
