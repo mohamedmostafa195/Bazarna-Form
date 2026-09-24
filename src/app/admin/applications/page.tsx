@@ -22,6 +22,7 @@ import {
   X,
   MapPin,
   Download,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminApplicationsPage() {
@@ -34,10 +35,15 @@ export default function AdminApplicationsPage() {
   const [eventFilter, setEventFilter] = useState("ALL");
   const [appStatusFilter, setAppStatusFilter] = useState("ALL");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("ALL");
+  const [deleteApp, setDeleteApp] = useState<EventApplication | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setApplications(BazarnaStore.getApplications());
     setEvents(BazarnaStore.getEvents());
+
+    // Sync with MongoDB Atlas immediately
+    BazarnaStore.syncWithServer();
 
     const handleUpdate = () => {
       setApplications(BazarnaStore.getApplications());
@@ -57,6 +63,21 @@ export default function AdminApplicationsPage() {
     BazarnaStore.updatePaymentStatus(appId, newStatus, "Dina Finance");
     setApplications(BazarnaStore.getApplications());
     addToast("info", "Payment Updated", `Payment marked as ${newStatus.replace("_", " ")}`);
+  };
+
+  const handleDeleteApplication = async (app: EventApplication) => {
+    setIsDeleting(true);
+    try {
+      BazarnaStore.deleteApplication(app.id, "Ahmed Operations");
+      setApplications(BazarnaStore.getApplications());
+      addToast("success", "Application Deleted", `Application ${app.applicationCode} was deleted.`);
+      setDeleteApp(null);
+    } catch (err) {
+      console.error("Error deleting application:", err);
+      addToast("error", "Delete Failed", "Failed to delete application.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const filtered = applications.filter((app) => {
@@ -164,7 +185,7 @@ export default function AdminApplicationsPage() {
                 <th className="py-4 px-4">Brand</th>
                 <th className="py-4 px-4">Event</th>
                 <th className="py-4 px-4">Package & Price</th>
-                <th className="py-4 px-4">Booth</th>
+                <th className="py-4 px-4 whitespace-nowrap">Booth</th>
                 <th className="py-4 px-4">App Status</th>
                 <th className="py-4 px-4">Payment</th>
                 <th className="py-4 px-6 text-right">Actions</th>
@@ -206,13 +227,13 @@ export default function AdminApplicationsPage() {
                       </div>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 whitespace-nowrap">
                       {app.assignedBooth ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-kiwi-100 text-kiwi-900 font-bold border border-kiwi-300">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-kiwi-100 text-kiwi-950 font-bold border border-kiwi-300 text-xs whitespace-nowrap tracking-wide">
                           {app.assignedBooth}
                         </span>
                       ) : (
-                        <span className="text-zinc-400 text-[11px]">Unassigned</span>
+                        <span className="text-zinc-400 text-[11px] whitespace-nowrap">Unassigned</span>
                       )}
                     </td>
 
@@ -246,15 +267,25 @@ export default function AdminApplicationsPage() {
                       </span>
                     </td>
 
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/admin/applications/${app.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-soft-sm transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-soft-sm transition"
                         >
-                          <Eye className="w-3 h-3 text-butter-300" />
+                          <Eye className="w-3.5 h-3.5 text-butter-300" />
                           Review Dossier
                         </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteApp(app)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 font-bold text-[11px] transition shadow-soft-xs"
+                          title="Delete Application"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -264,6 +295,65 @@ export default function AdminApplicationsPage() {
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-soft-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-zinc-900">Delete Application</h4>
+                <p className="text-xs text-zinc-500">
+                  Are you sure you want to permanently delete application{" "}
+                  <strong className="text-zinc-950 font-mono">{deleteApp.applicationCode}</strong>?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-1 text-xs text-zinc-600">
+              <div>
+                <span className="font-semibold text-zinc-400">Brand: </span>
+                <strong className="text-zinc-900">{deleteApp.brand?.brandName}</strong>
+              </div>
+              <div>
+                <span className="font-semibold text-zinc-400">Event: </span>
+                <span className="text-zinc-800">{deleteApp.event?.name?.split("|")[0]}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-zinc-400">Package: </span>
+                <span className="text-zinc-800">{deleteApp.package?.name}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-rose-600 font-medium">
+              ⚠️ This action cannot be undone. This application will be removed from MongoDB Atlas and package inventory will be restored.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteApp(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 hover:bg-zinc-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => handleDeleteApplication(deleteApp)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-soft-sm inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {isDeleting ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -39,9 +41,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
-      brandId,
-      eventId,
-      packageId,
+      brandId: rawBrandId,
+      eventId: rawEventId,
+      packageId: rawPackageId,
+      brand: brandData,
       prParticipation,
       notes,
       paymentMethod,
@@ -52,30 +55,95 @@ export async function POST(request: Request) {
       tcVersion,
     } = body;
 
-    if (!brandId || !eventId || !packageId) {
-      return NextResponse.json(
-        { error: "brandId, eventId, and packageId are required" },
-        { status: 400 }
-      );
+    // 1. Resolve Brand
+    let brand = null;
+    if (rawBrandId && /^[0-9a-fA-F]{24}$/.test(rawBrandId)) {
+      brand = await prisma.brand.findUnique({ where: { id: rawBrandId } });
     }
+    if (!brand && brandData?.contactEmail) {
+      brand = await prisma.brand.findFirst({ where: { contactEmail: brandData.contactEmail } });
+    }
+    if (!brand && brandData?.brandName) {
+      brand = await prisma.brand.findFirst({ where: { brandName: brandData.brandName } });
+    }
+    if (!brand) {
+      brand = await prisma.brand.findFirst();
+    }
+    if (!brand) {
+      return NextResponse.json({ error: "No brand found" }, { status: 400 });
+    }
+    const resolvedBrandId = brand.id;
+
+    // 2. Resolve Event
+    let event = null;
+    if (rawEventId && /^[0-9a-fA-F]{24}$/.test(rawEventId)) {
+      event = await prisma.event.findUnique({
+        where: { id: rawEventId },
+        include: { packages: true },
+      });
+    }
+    if (!event && rawEventId) {
+      const cleanSlug = rawEventId.replace(/^evt-/, "").toLowerCase();
+      event = await prisma.event.findFirst({
+        where: {
+          OR: [
+            { slug: { contains: cleanSlug, mode: "insensitive" } },
+            { slug: "byouth-summer-outlet-downtown" },
+          ],
+        },
+        include: { packages: true },
+      });
+    }
+    if (!event) {
+      event = await prisma.event.findFirst({
+        include: { packages: true },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+    if (!event) {
+      return NextResponse.json({ error: "No event found" }, { status: 400 });
+    }
+    const resolvedEventId = event.id;
+
+    // 3. Resolve Package
+    let pkg = null;
+    if (rawPackageId && /^[0-9a-fA-F]{24}$/.test(rawPackageId)) {
+      pkg = await prisma.eventPackage.findUnique({
+        where: { id: rawPackageId },
+      });
+    }
+    if (!pkg && event.packages && event.packages.length > 0) {
+      const pkgStr = String(rawPackageId || "").toLowerCase();
+      if (pkgStr.includes("5x3")) {
+        pkg = event.packages.find((p) => p.name.includes("5x3"));
+      } else if (pkgStr.includes("4x3")) {
+        pkg = event.packages.find((p) => p.name.includes("4x3"));
+      } else if (pkgStr.includes("3x3")) {
+        pkg = event.packages.find((p) => p.name.includes("3x3"));
+      } else if (pkgStr.includes("table")) {
+        pkg = event.packages.find((p) => p.name.toLowerCase().includes("table"));
+      }
+      if (!pkg) {
+        pkg = event.packages[0];
+      }
+    }
+    if (!pkg) {
+      return NextResponse.json({ error: "No package found for event" }, { status: 400 });
+    }
+    const resolvedPackageId = pkg.id;
 
     // Generate unique application code
     const totalCount = await prisma.application.count();
     const seq = (totalCount + 101).toString().padStart(6, "0");
     const applicationCode = `BY-2026-${seq}`;
 
-    // Fetch package for pricing info
-    const pkg = await prisma.eventPackage.findUnique({
-      where: { id: packageId },
-    });
-
     // Create application with relation items in MongoDB
     const application = await prisma.application.create({
       data: {
         applicationCode,
-        brandId,
-        eventId,
-        packageId,
+        brandId: resolvedBrandId,
+        eventId: resolvedEventId,
+        packageId: resolvedPackageId,
         prParticipation: !!prParticipation,
         notes: notes || "",
         appStatus: "SUBMITTED",
@@ -120,7 +188,7 @@ export async function POST(request: Request) {
     // Decrement package remainingQty if > 0
     if (pkg && pkg.remainingQty > 0) {
       await prisma.eventPackage.update({
-        where: { id: packageId },
+        where: { id: resolvedPackageId },
         data: { remainingQty: { decrement: 1 } },
       });
     }

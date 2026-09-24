@@ -83,7 +83,7 @@ async function syncWithServer(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
     // 1. Sync events from MongoDB
-    const eventsRes = await fetch("/api/events");
+    const eventsRes = await fetch("/api/events", { cache: "no-store" });
     if (eventsRes.ok) {
       const data = await eventsRes.json();
       if (data.success && Array.isArray(data.events) && data.events.length > 0) {
@@ -92,7 +92,7 @@ async function syncWithServer(): Promise<void> {
     }
 
     // 2. Sync applications from MongoDB
-    const appsRes = await fetch("/api/applications");
+    const appsRes = await fetch("/api/applications", { cache: "no-store" });
     if (appsRes.ok) {
       const data = await appsRes.json();
       if (data.success && Array.isArray(data.applications)) {
@@ -110,7 +110,7 @@ async function syncWithServer(): Promise<void> {
     }
 
     // 4. Sync audit logs from MongoDB
-    const logsRes = await fetch("/api/audit-logs");
+    const logsRes = await fetch("/api/audit-logs", { cache: "no-store" });
     if (logsRes.ok) {
       const data = await logsRes.json();
       if (data.success && Array.isArray(data.logs) && data.logs.length > 0) {
@@ -378,7 +378,13 @@ export const BazarnaStore = {
   },
 
   getApplicationsByBrand(brandId: string): EventApplication[] {
-    return this.getApplications().filter((a) => a.brandId === brandId);
+    const brand = this.getBrandById(brandId);
+    return this.getApplications().filter((a) => {
+      if (a.brandId === brandId) return true;
+      if (brand && a.brand?.brandName && brand.brandName && a.brand.brandName.toLowerCase() === brand.brandName.toLowerCase()) return true;
+      if (brand && a.brand?.contactEmail && brand.contactEmail && a.brand.contactEmail.toLowerCase() === brand.contactEmail.toLowerCase()) return true;
+      return false;
+    });
   },
 
   submitApplication(data: {
@@ -468,6 +474,7 @@ export const BazarnaStore = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandId: data.brand.id,
+          brand: data.brand,
           eventId: data.event.id,
           packageId: data.packageId,
           prParticipation: data.prParticipation,
@@ -605,6 +612,32 @@ export const BazarnaStore = {
         }).catch((err) => console.error("Error assigning booth in MongoDB:", err));
       }
     }
+  },
+
+  deleteApplication(appId: string, adminName: string = "Ahmed Operations"): boolean {
+    const apps = this.getApplications();
+    const app = apps.find((a) => a.id === appId || a.applicationCode === appId);
+    if (!app) return false;
+
+    const filtered = apps.filter((a) => a.id !== app.id && a.applicationCode !== app.applicationCode);
+    setStored(STORAGE_KEYS.APPLICATIONS, filtered);
+
+    this.addAuditLog(
+      adminName,
+      `Permanently deleted application ${app.applicationCode}`,
+      "APPLICATION",
+      app.id,
+      `Application for ${app.brand.brandName} was deleted.`
+    );
+
+    // Delete in MongoDB Atlas
+    if (typeof window !== "undefined") {
+      fetch(`/api/applications/${app.id}`, { method: "DELETE" }).catch((err) =>
+        console.error("Error deleting application in MongoDB:", err)
+      );
+    }
+
+    return true;
   },
 
   // --- AUDIT LOGS ---

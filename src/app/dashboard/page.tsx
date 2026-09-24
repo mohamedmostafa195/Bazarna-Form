@@ -28,6 +28,9 @@ export default function BrandDashboardPage() {
   useEffect(() => {
     setApplications(BazarnaStore.getApplicationsByBrand(currentBrand.id));
 
+    // Immediately sync with server
+    BazarnaStore.syncWithServer();
+
     const handleUpdate = () => {
       setApplications(BazarnaStore.getApplicationsByBrand(currentBrand.id));
     };
@@ -229,7 +232,7 @@ export default function BrandDashboardPage() {
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                     <th className="py-4 px-6">Event</th>
                     <th className="py-4 px-4">Package</th>
-                    <th className="py-4 px-4">Booth</th>
+                    <th className="py-4 px-4 whitespace-nowrap">Booth</th>
                     <th className="py-4 px-4">Application Status</th>
                     <th className="py-4 px-4">Payment Status</th>
                     <th className="py-4 px-6 text-right">Actions</th>
@@ -266,13 +269,13 @@ export default function BrandDashboardPage() {
                           </div>
                         </td>
 
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 whitespace-nowrap">
                           {app.assignedBooth ? (
-                            <span className="font-bold text-zinc-950 bg-kiwi-100 border border-kiwi-300 text-kiwi-900 px-2.5 py-1 rounded-lg">
+                            <span className="inline-flex items-center font-bold text-zinc-950 bg-kiwi-100 border border-kiwi-300 text-kiwi-900 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap tracking-wide">
                               {app.assignedBooth}
                             </span>
                           ) : (
-                            <span className="text-zinc-400 text-[11px]">Pending Allocation</span>
+                            <span className="text-zinc-400 text-[11px] whitespace-nowrap">Pending Allocation</span>
                           )}
                         </td>
 

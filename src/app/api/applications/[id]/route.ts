@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -118,6 +120,62 @@ export async function PATCH(
     console.error("PATCH /api/applications/[id] error:", error);
     return NextResponse.json(
       { error: error?.message || "Failed to update application" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    // Find the application first
+    let app = null;
+    if (id.length === 24 && /^[0-9a-fA-F]+$/.test(id)) {
+      app = await prisma.application.findUnique({ where: { id } });
+    }
+    if (!app) {
+      app = await prisma.application.findUnique({ where: { applicationCode: id } });
+    }
+
+    if (!app) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    // Delete related payment and answers
+    await prisma.payment.deleteMany({ where: { applicationId: app.id } });
+    await prisma.applicationAnswer.deleteMany({ where: { applicationId: app.id } });
+
+    // Restore package inventory if needed
+    if (app.packageId) {
+      await prisma.eventPackage.update({
+        where: { id: app.packageId },
+        data: { remainingQty: { increment: 1 } },
+      }).catch(() => null);
+    }
+
+    // Delete application
+    await prisma.application.delete({ where: { id: app.id } });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        adminName: "Admin Operations",
+        action: `Deleted application ${app.applicationCode}`,
+        targetType: "APPLICATION",
+        targetId: app.id,
+        details: `Application ${app.applicationCode} was permanently deleted.`,
+      },
+    });
+
+    return NextResponse.json({ success: true, message: "Application deleted successfully" });
+  } catch (error: any) {
+    console.error("DELETE /api/applications/[id] error:", error);
+    return NextResponse.json(
+      { error: error?.message || "Failed to delete application" },
       { status: 500 }
     );
   }

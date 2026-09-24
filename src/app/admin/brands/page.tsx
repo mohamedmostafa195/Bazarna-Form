@@ -50,8 +50,13 @@ export default function AdminBrandsPage() {
     );
   });
 
-  const getBrandHistory = (brandId: string) => {
-    return applications.filter((a) => a.brandId === brandId);
+  const getBrandHistory = (brand: BrandProfile) => {
+    return applications.filter(
+      (a) =>
+        a.brandId === brand.id ||
+        (a.brand?.brandName && a.brand.brandName.toLowerCase() === brand.brandName.toLowerCase()) ||
+        (a.brand?.contactEmail && a.brand.contactEmail.toLowerCase() === brand.contactEmail.toLowerCase())
+    );
   };
 
   return (
@@ -86,7 +91,7 @@ export default function AdminBrandsPage() {
       {/* Grid of Brands */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map((brand) => {
-          const history = getBrandHistory(brand.id);
+          const history = getBrandHistory(brand);
           const hasDocs = brand.documents && brand.documents.length > 0;
 
           return (
