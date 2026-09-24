@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   LayoutDashboard,
@@ -11,12 +12,20 @@ import {
   Users,
   Download,
   ShieldAlert,
-  Sparkles,
-  ChevronRight,
   PlusCircle,
+  ExternalLink,
+  LogOut,
+  Menu,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MoreVertical,
+  ChevronRight,
   ShieldCheck,
   Lock,
   ArrowRight,
+  Store,
+  Sparkles,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -25,7 +34,30 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { isAdmin, isLoggedIn } = useAuth();
+  const router = useRouter();
+  const { isAdmin, isLoggedIn, user, logout } = useAuth();
+
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on route change
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+    setProfileDropdownOpen(false);
+  }, [pathname]);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const navItems = [
     {
@@ -71,10 +103,19 @@ export default function AdminLayout({
     return pathname.startsWith(item.href);
   };
 
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  // Determine current active page title for the breadcrumb
+  const currentNavItem = navItems.find((item) => isActive(item));
+  const pageTitle = currentNavItem ? currentNavItem.name : "Admin";
+
   // Guard: Restrict access to Admin only
   if (!isAdmin) {
     return (
-      <div className="w-full min-h-[80vh] flex items-center justify-center px-4 py-16 bg-[#F8F9FA]">
+      <div className="w-full min-h-screen flex items-center justify-center px-4 py-16 bg-[#F8F9FA]">
         <div className="max-w-md w-full text-center space-y-6 bg-white p-8 sm:p-10 rounded-3xl border border-zinc-200/90 shadow-soft-lg">
           <div className="w-16 h-16 rounded-2xl bg-zinc-950 text-bazarna-gold flex items-center justify-center mx-auto shadow-soft-md">
             <Lock className="w-8 h-8" />
@@ -120,70 +161,376 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#F8F9FA] pb-20">
-      {/* Admin Top Header Banner */}
-      <div className="bg-zinc-950 text-white border-b border-zinc-800 py-4 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 text-bazarna-gold flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5" />
+    <div className="min-h-screen bg-[#F8F9FA] flex text-zinc-900">
+      {/* ========================================================
+          1. DESKTOP LEFT SIDEBAR (Dark theme matching reference)
+         ======================================================== */}
+      <aside
+        className={`hidden md:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#0E1013] text-zinc-300 border-r border-zinc-800/80 transition-all duration-300 ease-in-out ${
+          collapsed ? "w-20" : "w-64"
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800/80 shrink-0">
+          <Link
+            href="/admin"
+            className={`flex items-center gap-3 overflow-hidden ${
+              collapsed ? "justify-center w-full" : ""
+            }`}
+            title="Bazarna Operations"
+          >
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-soft-xs bg-zinc-900 border border-zinc-700/60 flex items-center justify-center">
+              <Image
+                src="/images/bazarna-symbol.png"
+                alt="Bazarna Symbol"
+                width={32}
+                height={32}
+                className="object-contain"
+                priority
+              />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-white leading-none">
-                  Bazarna Operations Portal
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-butter-300">
-                  Internal
+            {!collapsed && (
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-black tracking-wider text-white font-display truncate">
+                  BAZARNA
+                </span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                  OPS PORTAL
                 </span>
               </div>
-              <p className="text-xs text-zinc-400 mt-1">
-                Manage events, review brand applications, assign booths & verify payments
-              </p>
-            </div>
-          </div>
+            )}
+          </Link>
 
-          <div className="flex items-center gap-2">
+          {!collapsed && (
+            <button
+              onClick={() => setCollapsed(true)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Collapsed expand trigger */}
+        {collapsed && (
+          <div className="pt-2 px-3 flex justify-center">
+            <button
+              onClick={() => setCollapsed(false)}
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Navigation Items (Scrollable) */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {!collapsed && (
+            <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+              Management
+            </div>
+          )}
+
+          {navItems.map((item) => {
+            const active = isActive(item);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={collapsed ? item.name : undefined}
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                  active
+                    ? "bg-zinc-800 text-white shadow-soft-xs"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-850 hover:bg-zinc-800/40"
+                } ${collapsed ? "justify-center px-2" : ""}`}
+              >
+                <Icon
+                  className={`w-4 h-4 shrink-0 transition-colors ${
+                    active ? "text-butter-300" : "text-zinc-400 group-hover:text-zinc-200"
+                  }`}
+                />
+                {!collapsed && (
+                  <span className="truncate">{item.name}</span>
+                )}
+              </Link>
+            );
+          })}
+
+          {/* Quick Shortcuts Section */}
+          <div className="pt-4 mt-4 border-t border-zinc-800/80">
+            {!collapsed && (
+              <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                Shortcuts
+              </div>
+            )}
+
             <Link
               href="/admin/events/new"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-kiwi-500 hover:bg-kiwi-600 text-white font-bold text-xs shadow-kiwi-glow transition"
+              title={collapsed ? "Create New Event" : undefined}
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-kiwi-400 hover:text-kiwi-300 hover:bg-kiwi-950/30 transition-all ${
+                collapsed ? "justify-center px-2" : ""
+              }`}
             >
-              <PlusCircle className="w-3.5 h-3.5" />
-              Create New Event
+              <PlusCircle className="w-4 h-4 shrink-0 text-kiwi-400" />
+              {!collapsed && <span className="truncate font-bold">Create New Event</span>}
+            </Link>
+
+            <Link
+              href="/events"
+              target="_blank"
+              title={collapsed ? "View Public Calendar" : undefined}
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800/40 transition-all ${
+                collapsed ? "justify-center px-2" : ""
+              }`}
+            >
+              <ExternalLink className="w-4 h-4 shrink-0 text-zinc-400 group-hover:text-white" />
+              {!collapsed && <span className="truncate">View Public Site</span>}
             </Link>
           </div>
         </div>
-      </div>
 
-      {/* Admin Sub-navigation Bar (Desktop only, mobile accesses via right-side drawer) */}
-      <div className="hidden md:block bg-white border-b border-zinc-200 sticky top-16 sm:top-20 z-30 shadow-soft-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto py-2.5">
-            {navItems.map((item) => {
-              const active = isActive(item);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                    active
-                      ? "bg-zinc-900 text-white shadow-soft-sm"
-                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-                  }`}
+        {/* Sidebar Footer: User Account (Matching reference image) */}
+        <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/60 relative" ref={profileRef}>
+          <div
+            className={`flex items-center gap-3 p-1.5 rounded-xl transition ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            {/* User Avatar */}
+            <div className="relative shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700/80 text-bazarna-gold flex items-center justify-center font-bold text-xs shadow-soft-xs">
+                <ShieldCheck className="w-4 h-4 text-bazarna-gold" />
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-[#0E1013]" />
+            </div>
+
+            {/* User Info */}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-white truncate">
+                  {user?.name || "Ahmed Operations"}
+                </div>
+                <div className="text-[10px] text-zinc-400 truncate">
+                  {user?.email || "admin@bazarna.com"}
+                </div>
+              </div>
+            )}
+
+            {/* Popover / Options Trigger */}
+            {!collapsed && (
+              <div className="relative">
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                  aria-label="Admin settings"
                 >
-                  <Icon className={`w-3.5 h-3.5 ${active ? "text-butter-300" : "text-zinc-400"}`} />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {profileDropdownOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 w-48 bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-1.5 z-50 text-xs animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-2 border-b border-zinc-800 text-[11px] text-zinc-400">
+                      Logged in as <span className="font-bold text-white block truncate">{user?.email || "admin"}</span>
+                    </div>
+                    <Link
+                      href="/events"
+                      target="_blank"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>View Public Site</span>
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* ========================================================
+          2. MOBILE SLIDE-OVER DRAWER (From the LEFT)
+         ======================================================== */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 md:hidden transition-opacity duration-300"
+          onClick={() => setMobileDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div
+        className={`fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] bg-[#0E1013] text-zinc-300 z-50 md:hidden shadow-2xl flex flex-col transition-transform duration-300 ease-in-out border-r border-zinc-800 ${
+          mobileDrawerOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+        }`}
+      >
+        {/* Drawer Header */}
+        <div className="h-16 px-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-700/60 flex items-center justify-center">
+              <Image
+                src="/images/bazarna-symbol.png"
+                alt="Bazarna Symbol"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <span className="text-sm font-black tracking-wider text-white font-display block">
+                BAZARNA
+              </span>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">
+                OPS PORTAL
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileDrawerOpen(false)}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Drawer Nav Items */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+            Management
+          </div>
+          {navItems.map((item) => {
+            const active = isActive(item);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileDrawerOpen(false)}
+                className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition ${
+                  active
+                    ? "bg-zinc-800 text-white shadow-soft-xs"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-850 hover:bg-zinc-800/40"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-4 h-4 ${active ? "text-butter-300" : "text-zinc-400"}`} />
+                  <span>{item.name}</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 ${active ? "text-butter-300" : "text-zinc-600"}`} />
+              </Link>
+            );
+          })}
+
+          <div className="pt-4 mt-4 border-t border-zinc-800">
+            <Link
+              href="/admin/events/new"
+              onClick={() => setMobileDrawerOpen(false)}
+              className="flex items-center gap-2 px-3.5 py-3 rounded-xl text-xs font-bold text-kiwi-400 hover:bg-kiwi-950/30 transition"
+            >
+              <PlusCircle className="w-4 h-4 text-kiwi-400" />
+              <span>Create New Event</span>
+            </Link>
+            <Link
+              href="/events"
+              target="_blank"
+              onClick={() => setMobileDrawerOpen(false)}
+              className="flex items-center gap-2 px-3.5 py-3 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/40 transition"
+            >
+              <ExternalLink className="w-4 h-4 text-zinc-400" />
+              <span>View Public Site</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Drawer Footer */}
+        <div className="p-4 border-t border-zinc-800 bg-zinc-950/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 text-bazarna-gold flex items-center justify-center font-bold text-xs shrink-0">
+                <ShieldCheck className="w-4 h-4 text-bazarna-gold" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">
+                  {user?.name || "Ahmed Operations"}
+                </div>
+                <div className="text-[10px] text-zinc-400 truncate">
+                  {user?.email || "admin@bazarna.com"}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg text-rose-400 hover:bg-rose-950/40 transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Admin Page Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {children}
+      {/* ========================================================
+          3. MAIN CONTENT AREA (Offset by sidebar width on desktop)
+         ======================================================== */}
+      <div
+        className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${
+          collapsed ? "md:pl-20" : "md:pl-64"
+        }`}
+      >
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-30 h-14 sm:h-16 bg-white/95 backdrop-blur-md border-b border-zinc-200/90 px-4 sm:px-8 flex items-center justify-between shadow-soft-xs">
+          {/* Left: Mobile trigger & Breadcrumbs */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileDrawerOpen(true)}
+              className="md:hidden p-2 rounded-xl text-zinc-700 hover:bg-zinc-100 transition"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Desktop collapse toggle */}
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="hidden md:flex p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label="Toggle sidebar"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="w-4 h-4" />
+              ) : (
+                <PanelLeftClose className="w-4 h-4" />
+              )}
+            </button>
+
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
+              <span className="font-semibold text-zinc-400">Portal</span>
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-300" />
+              <span className="font-bold text-zinc-900">{pageTitle}</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Children */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

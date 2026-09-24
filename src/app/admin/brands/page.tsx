@@ -29,6 +29,9 @@ export default function AdminBrandsPage() {
     setBrands(BazarnaStore.getBrands());
     setApplications(BazarnaStore.getApplications());
 
+    // Immediately trigger server sync to reflect any manual database changes
+    BazarnaStore.syncWithServer();
+
     const handleUpdate = () => {
       setBrands(BazarnaStore.getBrands());
       setApplications(BazarnaStore.getApplications());

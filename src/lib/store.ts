@@ -101,10 +101,10 @@ async function syncWithServer(): Promise<void> {
     }
 
     // 3. Sync brands from MongoDB
-    const brandsRes = await fetch("/api/brands");
+    const brandsRes = await fetch("/api/brands", { cache: "no-store" });
     if (brandsRes.ok) {
       const data = await brandsRes.json();
-      if (data.success && Array.isArray(data.brands) && data.brands.length > 0) {
+      if (data.success && Array.isArray(data.brands)) {
         setStored(STORAGE_KEYS.BRANDS, data.brands);
       }
     }

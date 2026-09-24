@@ -106,6 +106,10 @@ export function Navbar() {
     router.push("/login");
   };
 
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-200/80 bg-[#FAF8F5]/90 backdrop-blur-md">
       {/* Main Navigation Bar */}
