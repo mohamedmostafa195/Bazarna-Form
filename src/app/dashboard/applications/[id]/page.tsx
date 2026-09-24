@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { BazarnaStore } from "@/lib/store";
 import { EventApplication } from "@/lib/types";
+import { readFileAsOptimizedDataUrl } from "@/lib/image-util";
 import {
   ArrowLeft,
   ArrowRight,
@@ -121,12 +122,17 @@ export default function ApplicationDetailPage() {
     },
   ];
 
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    if (file.size > 15 * 1024 * 1024) {
+      addToast("error", "File Too Large", "Maximum supported file size is 15MB.");
+      return;
+    }
+
+    try {
+      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
       BazarnaStore.updatePaymentStatus(
         application.id,
         "RECEIPT_UPLOADED",
@@ -134,14 +140,16 @@ export default function ApplicationDetailPage() {
         `Uploaded receipt: ${file.name}`
       );
       if (application.payment) {
-        application.payment.receiptFileUrl = reader.result as string;
+        application.payment.receiptFileUrl = optimizedUrl;
         application.payment.receiptFileName = file.name;
         application.payment.paymentStatus = "RECEIPT_UPLOADED";
       }
       setApplication({ ...application, paymentStatus: "RECEIPT_UPLOADED" });
       addToast("success", "Receipt Uploaded", `${file.name} uploaded for review.`);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Receipt upload error:", err);
+      addToast("error", "Upload Failed", "Could not process receipt file.");
+    }
   };
 
   return (

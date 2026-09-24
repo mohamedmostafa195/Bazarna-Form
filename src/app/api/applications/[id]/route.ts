@@ -64,6 +64,8 @@ export async function PATCH(
       assignedBooth,
       adminNote,
       adminName = "Admin",
+      receiptFileUrl,
+      receiptFileName,
     } = body;
 
     const dataToUpdate: any = {};
@@ -75,7 +77,11 @@ export async function PATCH(
       where: { id },
       data: dataToUpdate,
       include: {
-        brand: true,
+        brand: {
+          include: {
+            documents: true,
+          },
+        },
         event: true,
         package: true,
         payment: true,
@@ -83,14 +89,19 @@ export async function PATCH(
       },
     });
 
-    // Update payment record if status or adminNote provided
-    if (paymentStatus || adminNote) {
+    // Update payment record if status, receipt, or adminNote provided
+    if (paymentStatus || adminNote || receiptFileUrl) {
       const paymentUpdateData: any = {};
       if (paymentStatus) {
         paymentUpdateData.paymentStatus = paymentStatus;
         if (paymentStatus === "PAID") {
           paymentUpdateData.verifiedAt = new Date();
         }
+      }
+      if (receiptFileUrl) {
+        paymentUpdateData.receiptFileUrl = receiptFileUrl;
+        paymentUpdateData.receiptFileName = receiptFileName || "receipt.jpg";
+        paymentUpdateData.uploadedAt = new Date();
       }
       if (adminNote) paymentUpdateData.adminNote = adminNote;
 

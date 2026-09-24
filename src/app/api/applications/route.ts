@@ -16,7 +16,11 @@ export async function GET(request: Request) {
     const applications = await prisma.application.findMany({
       where: whereClause,
       include: {
-        brand: true,
+        brand: {
+          include: {
+            documents: true,
+          },
+        },
         event: true,
         package: true,
         payment: true,
@@ -73,6 +77,53 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No brand found" }, { status: 400 });
     }
     const resolvedBrandId = brand.id;
+
+    // Update brand legal info and documents if provided
+    if (brandData) {
+      const legalUpdates: any = {};
+      if (brandData.taxId) legalUpdates.taxId = brandData.taxId;
+      if (brandData.nationalId) legalUpdates.nationalId = brandData.nationalId;
+      if (Object.keys(legalUpdates).length > 0) {
+        await prisma.brand.update({
+          where: { id: resolvedBrandId },
+          data: legalUpdates,
+        }).catch(() => null);
+      }
+
+      if (Array.isArray(brandData.documents) && brandData.documents.length > 0) {
+        for (const doc of brandData.documents) {
+          if (!doc.documentType || !doc.fileUrl) continue;
+          const existingDoc = await prisma.brandDocument.findFirst({
+            where: {
+              brandId: resolvedBrandId,
+              documentType: doc.documentType,
+            },
+          });
+          if (existingDoc) {
+            await prisma.brandDocument.update({
+              where: { id: existingDoc.id },
+              data: {
+                fileName: doc.fileName || `${doc.documentType}.png`,
+                fileUrl: doc.fileUrl,
+                fileSize: doc.fileSize || 0,
+                status: doc.status || "UPLOADED",
+              },
+            }).catch(() => null);
+          } else {
+            await prisma.brandDocument.create({
+              data: {
+                brandId: resolvedBrandId,
+                documentType: doc.documentType,
+                fileName: doc.fileName || `${doc.documentType}.png`,
+                fileUrl: doc.fileUrl,
+                fileSize: doc.fileSize || 0,
+                status: doc.status || "UPLOADED",
+              },
+            }).catch(() => null);
+          }
+        }
+      }
+    }
 
     // 2. Resolve Event
     let event = null;
@@ -177,7 +228,11 @@ export async function POST(request: Request) {
         },
       },
       include: {
-        brand: true,
+        brand: {
+          include: {
+            documents: true,
+          },
+        },
         event: true,
         package: true,
         payment: true,

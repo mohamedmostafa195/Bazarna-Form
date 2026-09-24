@@ -49,14 +49,33 @@ export default function AdminApplicationReviewPage() {
   const [previewModal, setPreviewModal] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
-    if (id) {
+    if (!id) return;
+
+    const loadApplication = () => {
       const found = BazarnaStore.getApplicationById(id);
       if (found) {
         setApplication(found);
         setBoothInput(found.assignedBooth || "");
       }
       setLoading(false);
-    }
+    };
+
+    loadApplication();
+
+    window.addEventListener("bazarna_store_updated", loadApplication);
+
+    // Also attempt fetching from server API if available
+    fetch(`/api/applications/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.application) {
+          setApplication(data.application);
+          setBoothInput(data.application.assignedBooth || "");
+        }
+      })
+      .catch(() => null);
+
+    return () => window.removeEventListener("bazarna_store_updated", loadApplication);
   }, [id]);
 
   if (loading) {
@@ -274,73 +293,88 @@ export default function AdminApplicationReviewPage() {
               Legal Documents & Verification
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <span className="text-zinc-400 block font-semibold">TAX ID Number</span>
-                <span className="font-mono font-bold text-zinc-900">
-                  {application.brand.taxId || "Not Provided"}
-                </span>
-              </div>
-              <div>
-                <span className="text-zinc-400 block font-semibold">National ID Number</span>
-                <span className="font-mono font-bold text-zinc-900">
-                  {application.brand.nationalId || "Not Provided"}
-                </span>
-              </div>
-            </div>
-
-            {/* Document Previews */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
-              {/* Tax ID Doc */}
-              {(() => {
-                const doc = application.brand.documents?.find((d) => d.documentType === "TAX_ID_CARD");
-                return (
-                  <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                    <span className="font-bold text-zinc-900 block">Tax ID Card Scan</span>
-                    {doc ? (
-                      <div className="flex items-center justify-between">
-                        <span className="text-zinc-600 truncate max-w-[140px]">{doc.fileName}</span>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewModal({ url: doc.fileUrl, title: "Tax ID Card" })}
-                          className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Preview
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-zinc-400 italic">No document uploaded</span>
-                    )}
-                  </div>
+            {(() => {
+              const brandProfile =
+                BazarnaStore.getBrandById(application.brandId) ||
+                BazarnaStore.getBrands().find(
+                  (b) =>
+                    (b.brandName && application.brand?.brandName && b.brandName.toLowerCase() === application.brand.brandName.toLowerCase()) ||
+                    (b.contactEmail && application.brand?.contactEmail && b.contactEmail.toLowerCase() === application.brand.contactEmail.toLowerCase())
                 );
-              })()}
 
-              {/* National ID Doc */}
-              {(() => {
-                const doc = application.brand.documents?.find((d) => d.documentType === "NATIONAL_ID");
-                return (
-                  <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                    <span className="font-bold text-zinc-900 block">National ID Scan</span>
-                    {doc ? (
-                      <div className="flex items-center justify-between">
-                        <span className="text-zinc-600 truncate max-w-[140px]">{doc.fileName}</span>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewModal({ url: doc.fileUrl, title: "National ID" })}
-                          className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Preview
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-zinc-400 italic">No document uploaded</span>
-                    )}
+              const taxIdValue = application.brand.taxId || brandProfile?.taxId || "Not Provided";
+              const nationalIdValue = application.brand.nationalId || brandProfile?.nationalId || "Not Provided";
+
+              const taxDoc =
+                application.brand.documents?.find((d) => d.documentType === "TAX_ID_CARD") ||
+                brandProfile?.documents?.find((d) => d.documentType === "TAX_ID_CARD");
+
+              const nationalDoc =
+                application.brand.documents?.find((d) => d.documentType === "NATIONAL_ID") ||
+                brandProfile?.documents?.find((d) => d.documentType === "NATIONAL_ID");
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-zinc-400 block font-semibold">TAX ID Number</span>
+                      <span className="font-mono font-bold text-zinc-900">
+                        {taxIdValue}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-400 block font-semibold">National ID Number</span>
+                      <span className="font-mono font-bold text-zinc-900">
+                        {nationalIdValue}
+                      </span>
+                    </div>
                   </div>
-                );
-              })()}
-            </div>
+
+                  {/* Document Previews */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+                    {/* Tax ID Doc */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                      <span className="font-bold text-zinc-900 block">Tax ID Card Scan</span>
+                      {taxDoc ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-600 truncate max-w-[140px]">{taxDoc.fileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewModal({ url: taxDoc.fileUrl, title: "Tax ID Card" })}
+                            className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Preview
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 italic">No document uploaded</span>
+                      )}
+                    </div>
+
+                    {/* National ID Doc */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                      <span className="font-bold text-zinc-900 block">National ID Scan</span>
+                      {nationalDoc ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-600 truncate max-w-[140px]">{nationalDoc.fileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewModal({ url: nationalDoc.fileUrl, title: "National ID" })}
+                            className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Preview
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 italic">No document uploaded</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* PR Participation & Custom Questions */}

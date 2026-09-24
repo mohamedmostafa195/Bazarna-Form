@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { BazarnaStore } from "@/lib/store";
 import { BrandProfile, BrandDocument, DocumentStatus } from "@/lib/types";
+import { readFileAsOptimizedDataUrl } from "@/lib/image-util";
 import {
   Store,
   User,
@@ -52,6 +53,13 @@ export default function BrandProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"brand" | "contact" | "legal" | "documents">("brand");
 
+  // Keep formData in sync whenever currentBrand updates or switches
+  useEffect(() => {
+    if (currentBrand) {
+      setFormData({ ...currentBrand });
+    }
+  }, [currentBrand]);
+
   const handleTextChange = (field: keyof BrandProfile, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -74,24 +82,25 @@ export default function BrandProfilePage() {
     }
   };
 
-  // Mock file upload handler
-  const handleFileUpload = (docType: "TAX_ID_CARD" | "NATIONAL_ID", e: React.ChangeEvent<HTMLInputElement>) => {
+  // Optimized file upload handler with auto-compression to avoid localStorage quota issues
+  const handleFileUpload = async (docType: "TAX_ID_CARD" | "NATIONAL_ID", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      addToast("error", "File Too Large", "Maximum supported file size is 10MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      addToast("error", "File Too Large", "Maximum supported file size is 15MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      const optimizedDataUrl = await readFileAsOptimizedDataUrl(file);
+
       const newDoc: BrandDocument = {
         id: `doc-${Date.now()}`,
         brandId: formData.id,
         documentType: docType,
         fileName: file.name,
-        fileUrl: reader.result as string,
+        fileUrl: optimizedDataUrl,
         fileSize: file.size,
         status: "UNDER_REVIEW",
         uploadedAt: new Date().toISOString(),
@@ -113,8 +122,10 @@ export default function BrandProfilePage() {
         "Document Uploaded",
         `${file.name} uploaded and set for operations review.`
       );
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Upload error:", err);
+      addToast("error", "Upload Failed", "Could not process document. Please try again.");
+    }
   };
 
   const getDoc = (docType: string) => {

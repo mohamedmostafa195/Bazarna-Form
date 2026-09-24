@@ -83,11 +83,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleState(authenticatedUser.role);
         BazarnaStore.setCurrentUser(authenticatedUser);
         if (authenticatedUser.brand) {
-          setCurrentBrandState(authenticatedUser.brand);
+          BazarnaStore.saveBrand(authenticatedUser.brand);
           BazarnaStore.setCurrentBrand(authenticatedUser.brand.id);
+          setCurrentBrandState(authenticatedUser.brand);
         }
         addToast("success", "Welcome back!", `Logged in as ${authenticatedUser.name}`);
         return { success: true, user: authenticatedUser };
+      }
+      if (res.status >= 500) {
+        throw new Error("Server unavailable, trying local login");
       }
       return { success: false, error: data.error || "Invalid email or password." };
     } catch (err) {
@@ -98,9 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(authenticatedUser);
       setRoleState(authenticatedUser.role);
+      BazarnaStore.setCurrentUser(authenticatedUser);
       if (authenticatedUser.brandId) {
         const brand = BazarnaStore.getBrandById(authenticatedUser.brandId);
-        if (brand) setCurrentBrandState(brand);
+        if (brand) {
+          BazarnaStore.setCurrentBrand(brand.id);
+          setCurrentBrandState(brand);
+        }
       }
       addToast("success", "Welcome back!", `Logged in as ${authenticatedUser.name}`);
       return { success: true, user: authenticatedUser };
@@ -128,12 +136,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleState(newUser.role);
         BazarnaStore.setCurrentUser(newUser);
         if (newUser.brand) {
-          setCurrentBrandState(newUser.brand);
+          BazarnaStore.saveBrand(newUser.brand);
           BazarnaStore.setCurrentBrand(newUser.brand.id);
+          setCurrentBrandState(newUser.brand);
         }
         setAvailableBrands(BazarnaStore.getBrands());
         addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${params.brandName}!`);
         return { success: true, user: newUser };
+      }
+      if (res.status >= 500) {
+        throw new Error("Server unavailable, trying local registration");
       }
       return { success: false, error: data.error || "Failed to create account." };
     } catch (err) {
@@ -146,6 +158,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { user: newUser, brand: newBrand } = BazarnaStore.registerBrand(params);
       setUser(newUser);
       setRoleState(newUser.role);
+      BazarnaStore.setCurrentUser(newUser);
+      BazarnaStore.saveBrand(newBrand);
+      BazarnaStore.setCurrentBrand(newBrand.id);
       setCurrentBrandState(newBrand);
       setAvailableBrands(BazarnaStore.getBrands());
       addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${newBrand.brandName}!`);

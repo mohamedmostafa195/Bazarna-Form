@@ -350,13 +350,50 @@ export const BazarnaStore = {
 
   saveBrand(brand: BrandProfile): void {
     const brands = this.getBrands();
-    const index = brands.findIndex((b) => b.id === brand.id);
+    const index = brands.findIndex((b) => b.id === brand.id || (b.brandName && brand.brandName && b.brandName.toLowerCase() === brand.brandName.toLowerCase()));
     if (index >= 0) {
-      brands[index] = { ...brand, updatedAt: new Date().toISOString() };
+      brands[index] = { ...brands[index], ...brand, updatedAt: new Date().toISOString() };
     } else {
       brands.push({ ...brand, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }
     setStored(STORAGE_KEYS.BRANDS, brands);
+
+    // Also update any existing applications for this brand so their documents & legal details stay in sync
+    const apps = this.getApplications();
+    let appsModified = false;
+    const updatedApps = apps.map((app) => {
+      const isMatch =
+        app.brandId === brand.id ||
+        (app.brand?.id && brand.id && app.brand.id === brand.id) ||
+        (app.brand?.brandName && brand.brandName && app.brand.brandName.toLowerCase() === brand.brandName.toLowerCase()) ||
+        (app.brand?.contactEmail && brand.contactEmail && app.brand.contactEmail.toLowerCase() === brand.contactEmail.toLowerCase());
+
+      if (isMatch) {
+        appsModified = true;
+        const existingDocs = app.brand?.documents || [];
+        const incomingDocs = brand.documents || [];
+        const docTypes = new Set([...existingDocs.map((d) => d.documentType), ...incomingDocs.map((d) => d.documentType)]);
+        const mergedDocs = Array.from(docTypes).map((type) => {
+          return incomingDocs.find((d) => d.documentType === type) || existingDocs.find((d) => d.documentType === type)!;
+        });
+
+        return {
+          ...app,
+          brand: {
+            ...app.brand,
+            ...brand,
+            taxId: brand.taxId || app.brand?.taxId,
+            nationalId: brand.nationalId || app.brand?.nationalId,
+            documents: mergedDocs,
+          },
+        };
+      }
+      return app;
+    });
+
+    if (appsModified) {
+      setStored(STORAGE_KEYS.APPLICATIONS, updatedApps);
+    }
 
     // Persist to MongoDB Atlas
     if (typeof window !== "undefined" && brand.id && brand.id.length === 24) {
@@ -374,7 +411,39 @@ export const BazarnaStore = {
   },
 
   getApplicationById(id: string): EventApplication | undefined {
-    return this.getApplications().find((a) => a.id === id || a.applicationCode === id);
+    const app = this.getApplications().find((a) => a.id === id || a.applicationCode === id);
+    if (!app) return undefined;
+
+    // Enrich with latest brand profile details and documents if available
+    const brand =
+      this.getBrandById(app.brandId) ||
+      this.getBrands().find(
+        (b) =>
+          (b.brandName && app.brand?.brandName && b.brandName.toLowerCase() === app.brand.brandName.toLowerCase()) ||
+          (b.contactEmail && app.brand?.contactEmail && b.contactEmail.toLowerCase() === app.brand.contactEmail.toLowerCase())
+      );
+
+    if (brand) {
+      const existingDocs = app.brand?.documents || [];
+      const brandDocs = brand.documents || [];
+      const docTypes = new Set([...existingDocs.map((d) => d.documentType), ...brandDocs.map((d) => d.documentType)]);
+      const mergedDocs = Array.from(docTypes).map((type) => {
+        return brandDocs.find((d) => d.documentType === type) || existingDocs.find((d) => d.documentType === type)!;
+      });
+
+      return {
+        ...app,
+        brand: {
+          ...brand,
+          ...app.brand,
+          taxId: app.brand?.taxId || brand.taxId,
+          nationalId: app.brand?.nationalId || brand.nationalId,
+          documents: mergedDocs,
+        },
+      };
+    }
+
+    return app;
   },
 
   getApplicationsByBrand(brandId: string): EventApplication[] {

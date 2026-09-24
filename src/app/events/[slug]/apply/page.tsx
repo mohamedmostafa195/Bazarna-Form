@@ -11,6 +11,7 @@ import {
   EventPackage,
   BrandDocument,
 } from "@/lib/types";
+import { readFileAsOptimizedDataUrl } from "@/lib/image-util";
 import {
   Sparkles,
   ArrowRight,
@@ -130,39 +131,50 @@ export default function EventApplicationWizard() {
 
   const selectedPackage = event.packages.find((p) => p.id === selectedPackageId);
 
-  // File Upload Handlers
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Handlers with auto-compression
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      addToast("error", "File Too Large", "Maximum supported receipt size is 10MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      addToast("error", "File Too Large", "Maximum supported receipt size is 15MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
       setReceiptFile({
-        url: reader.result as string,
+        url: optimizedUrl,
         name: file.name,
       });
       addToast("success", "Receipt Uploaded", `${file.name} attached successfully.`);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Receipt upload error:", err);
+      addToast("error", "Upload Failed", "Could not process receipt image.");
+    }
   };
 
-  const handleDocumentUpload = (docType: "TAX_ID_CARD" | "NATIONAL_ID", e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (
+    docType: "TAX_ID_CARD" | "NATIONAL_ID",
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    if (file.size > 15 * 1024 * 1024) {
+      addToast("error", "File Too Large", "Maximum supported file size is 15MB.");
+      return;
+    }
+
+    try {
+      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
+
       const newDoc: BrandDocument = {
         id: `doc-${Date.now()}`,
         brandId: brandData.id,
         documentType: docType,
         fileName: file.name,
-        fileUrl: reader.result as string,
+        fileUrl: optimizedUrl,
         fileSize: file.size,
         status: "UPLOADED",
         uploadedAt: new Date().toISOString(),
@@ -176,8 +188,10 @@ export default function EventApplicationWizard() {
       BazarnaStore.saveBrand(updatedBrand);
 
       addToast("success", "Document Saved", `${file.name} saved to your brand profile.`);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Document upload error:", err);
+      addToast("error", "Upload Failed", "Could not process document file.");
+    }
   };
 
   const canProceed = () => {
