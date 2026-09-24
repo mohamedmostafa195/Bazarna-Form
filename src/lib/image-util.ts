@@ -4,10 +4,14 @@
  */
 export async function readFileAsOptimizedDataUrl(
   file: File,
-  maxWidth = 1200,
-  quality = 0.75
+  maxWidth = 1000,
+  quality = 0.68
 ): Promise<string> {
-  if (file.type.startsWith("image/")) {
+  const isImage =
+    (file.type && file.type.startsWith("image/")) ||
+    /\.(jpe?g|png|webp|bmp|gif|avif)$/i.test(file.name);
+
+  if (isImage) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {

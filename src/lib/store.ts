@@ -352,7 +352,19 @@ export const BazarnaStore = {
     const brands = this.getBrands();
     const index = brands.findIndex((b) => b.id === brand.id || (b.brandName && brand.brandName && b.brandName.toLowerCase() === brand.brandName.toLowerCase()));
     if (index >= 0) {
-      brands[index] = { ...brands[index], ...brand, updatedAt: new Date().toISOString() };
+      const existingBrandDocs = brands[index].documents || [];
+      const incomingBrandDocs = brand.documents || [];
+      const docTypes = new Set([...existingBrandDocs.map((d) => d.documentType), ...incomingBrandDocs.map((d) => d.documentType)]);
+      const mergedBrandDocs = Array.from(docTypes).map((type) => {
+        return incomingBrandDocs.find((d) => d.documentType === type) || existingBrandDocs.find((d) => d.documentType === type)!;
+      });
+
+      brands[index] = {
+        ...brands[index],
+        ...brand,
+        documents: mergedBrandDocs,
+        updatedAt: new Date().toISOString(),
+      };
     } else {
       brands.push({ ...brand, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }

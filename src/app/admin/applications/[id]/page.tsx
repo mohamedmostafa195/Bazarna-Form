@@ -9,6 +9,7 @@ import {
   EventApplication,
   ApplicationStatus,
   PaymentStatus,
+  BrandDocument,
 } from "@/lib/types";
 import {
   ArrowLeft,
@@ -28,7 +29,9 @@ import {
   Check,
   X,
   Send,
+  Upload,
 } from "lucide-react";
+import { readFileAsOptimizedDataUrl } from "@/lib/image-util";
 
 export default function AdminApplicationReviewPage() {
   const params = useParams();
@@ -97,6 +100,53 @@ export default function AdminApplicationReviewPage() {
       </div>
     );
   }
+
+  const handleQuickDocUpload = async (
+    docType: "TAX_ID_CARD" | "NATIONAL_ID",
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !application) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      addToast("error", "File Too Large", "Maximum supported file size is 15MB.");
+      return;
+    }
+
+    try {
+      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
+      const newDoc: BrandDocument = {
+        id: `doc-${Date.now()}`,
+        brandId: application.brandId,
+        documentType: docType,
+        fileName: file.name,
+        fileUrl: optimizedUrl,
+        fileSize: file.size,
+        status: "UPLOADED",
+        uploadedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const brandProfile =
+        BazarnaStore.getBrandById(application.brandId) ||
+        BazarnaStore.getBrands().find(
+          (b) =>
+            (b.brandName && application.brand?.brandName && b.brandName.toLowerCase() === application.brand.brandName.toLowerCase()) ||
+            (b.contactEmail && application.brand?.contactEmail && b.contactEmail.toLowerCase() === application.brand.contactEmail.toLowerCase())
+        ) ||
+        application.brand;
+
+      const existingDocs = brandProfile.documents || [];
+      const updatedDocs = [...existingDocs.filter((d) => d.documentType !== docType), newDoc];
+      const updatedBrand = { ...brandProfile, documents: updatedDocs };
+
+      BazarnaStore.saveBrand(updatedBrand);
+      addToast("success", "Document Saved", `${file.name} saved successfully.`);
+    } catch (err) {
+      console.error("Upload error:", err);
+      addToast("error", "Upload Failed", "Could not process document file.");
+    }
+  };
 
   const handleAppStatus = (status: ApplicationStatus, reason?: string) => {
     BazarnaStore.updateApplicationStatus(application.id, status, "Ahmed Operations", reason);
@@ -305,13 +355,27 @@ export default function AdminApplicationReviewPage() {
               const taxIdValue = application.brand.taxId || brandProfile?.taxId || "Not Provided";
               const nationalIdValue = application.brand.nationalId || brandProfile?.nationalId || "Not Provided";
 
-              const taxDoc =
-                application.brand.documents?.find((d) => d.documentType === "TAX_ID_CARD") ||
-                brandProfile?.documents?.find((d) => d.documentType === "TAX_ID_CARD");
+              const allDocs = [
+                ...(application.brand.documents || []),
+                ...(brandProfile?.documents || []),
+              ];
+
+              const taxDoc = allDocs.find(
+                (d) =>
+                  d.documentType === "TAX_ID_CARD" ||
+                  d.documentType?.toLowerCase()?.includes("tax") ||
+                  d.fileName?.toLowerCase()?.includes("tax")
+              );
 
               const nationalDoc =
-                application.brand.documents?.find((d) => d.documentType === "NATIONAL_ID") ||
-                brandProfile?.documents?.find((d) => d.documentType === "NATIONAL_ID");
+                allDocs.find(
+                  (d) =>
+                    d.documentType === "NATIONAL_ID" ||
+                    d.documentType?.toLowerCase()?.includes("national") ||
+                    d.fileName?.toLowerCase()?.includes("national") ||
+                    d.fileName?.toLowerCase()?.includes("id")
+                ) ||
+                allDocs.find((d) => d !== taxDoc && d.fileName !== taxDoc?.fileName);
 
               return (
                 <>
@@ -334,7 +398,19 @@ export default function AdminApplicationReviewPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
                     {/* Tax ID Doc */}
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <span className="font-bold text-zinc-900 block">Tax ID Card Scan</span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-zinc-900 block">Tax ID Card Scan</span>
+                        <label className="cursor-pointer text-[10px] font-bold text-zinc-600 hover:text-zinc-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-zinc-200 hover:border-zinc-300 transition">
+                          <Upload className="w-2.5 h-2.5 text-zinc-500" />
+                          {taxDoc ? "Change" : "Upload"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,application/pdf"
+                            onChange={(e) => handleQuickDocUpload("TAX_ID_CARD", e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                       {taxDoc ? (
                         <div className="flex items-center justify-between">
                           <span className="text-zinc-600 truncate max-w-[140px]">{taxDoc.fileName}</span>
@@ -354,7 +430,19 @@ export default function AdminApplicationReviewPage() {
 
                     {/* National ID Doc */}
                     <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
-                      <span className="font-bold text-zinc-900 block">National ID Scan</span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-zinc-900 block">National ID Scan</span>
+                        <label className="cursor-pointer text-[10px] font-bold text-zinc-600 hover:text-zinc-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-zinc-200 hover:border-zinc-300 transition">
+                          <Upload className="w-2.5 h-2.5 text-zinc-500" />
+                          {nationalDoc ? "Change" : "Upload"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,application/pdf"
+                            onChange={(e) => handleQuickDocUpload("NATIONAL_ID", e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                       {nationalDoc ? (
                         <div className="flex items-center justify-between">
                           <span className="text-zinc-600 truncate max-w-[140px]">{nationalDoc.fileName}</span>
