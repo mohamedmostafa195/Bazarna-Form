@@ -323,18 +323,6 @@ export default function AdminEventsPage() {
                       </div>
                     </div>
 
-                    {/* View Public Page */}
-                    <Link
-                      href={`/events/${event.slug}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-xs font-bold text-zinc-700 transition shadow-soft-xs"
-                      title="View public registration page"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-zinc-500" />
-                      <span>View</span>
-                      <ArrowUpRight className="w-3 h-3 text-zinc-400" />
-                    </Link>
-
                     {/* Edit Event Button */}
                     <Link
                       href={`/admin/events/${event.id}/edit`}
@@ -374,13 +362,6 @@ export default function AdminEventsPage() {
                       </strong>
                     </span>
                   </div>
-
-                  <Link
-                    href={`/admin/events/${event.id}/edit`}
-                    className="text-xs font-bold text-kiwi-800 hover:text-kiwi-950 inline-flex items-center gap-1 transition"
-                  >
-                    Manage packages & pricing →
-                  </Link>
                 </div>
 
                 {/* 3. Event Packages Grid — Clearly Organized */}

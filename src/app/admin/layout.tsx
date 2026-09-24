@@ -262,37 +262,7 @@ export default function AdminLayout({
             );
           })}
 
-          {/* Quick Shortcuts Section */}
-          <div className="pt-4 mt-4 border-t border-zinc-800/80">
-            {!collapsed && (
-              <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                Shortcuts
-              </div>
-            )}
 
-            <Link
-              href="/admin/events/new"
-              title={collapsed ? "Create New Event" : undefined}
-              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-kiwi-400 hover:text-kiwi-300 hover:bg-kiwi-950/30 transition-all ${
-                collapsed ? "justify-center px-2" : ""
-              }`}
-            >
-              <PlusCircle className="w-4 h-4 shrink-0 text-kiwi-400" />
-              {!collapsed && <span className="truncate font-bold">Create New Event</span>}
-            </Link>
-
-            <Link
-              href="/events"
-              target="_blank"
-              title={collapsed ? "View Public Calendar" : undefined}
-              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800/40 transition-all ${
-                collapsed ? "justify-center px-2" : ""
-              }`}
-            >
-              <ExternalLink className="w-4 h-4 shrink-0 text-zinc-400 group-hover:text-white" />
-              {!collapsed && <span className="truncate">View Public Site</span>}
-            </Link>
-          </div>
         </div>
 
         {/* Sidebar Footer: User Account (Matching reference image) */}
@@ -338,14 +308,6 @@ export default function AdminLayout({
                     <div className="px-3 py-2 border-b border-zinc-800 text-[11px] text-zinc-400">
                       Logged in as <span className="font-bold text-white block truncate">{user?.email || "admin"}</span>
                     </div>
-                    <Link
-                      href="/events"
-                      target="_blank"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>View Public Site</span>
-                    </Link>
                     <button
                       onClick={handleLogout}
                       className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
@@ -435,25 +397,7 @@ export default function AdminLayout({
             );
           })}
 
-          <div className="pt-4 mt-4 border-t border-zinc-800">
-            <Link
-              href="/admin/events/new"
-              onClick={() => setMobileDrawerOpen(false)}
-              className="flex items-center gap-2 px-3.5 py-3 rounded-xl text-xs font-bold text-kiwi-400 hover:bg-kiwi-950/30 transition"
-            >
-              <PlusCircle className="w-4 h-4 text-kiwi-400" />
-              <span>Create New Event</span>
-            </Link>
-            <Link
-              href="/events"
-              target="_blank"
-              onClick={() => setMobileDrawerOpen(false)}
-              className="flex items-center gap-2 px-3.5 py-3 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/40 transition"
-            >
-              <ExternalLink className="w-4 h-4 text-zinc-400" />
-              <span>View Public Site</span>
-            </Link>
-          </div>
+
         </div>
 
         {/* Drawer Footer */}
