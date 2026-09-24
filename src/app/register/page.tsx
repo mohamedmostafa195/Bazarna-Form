@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
@@ -29,8 +29,10 @@ const BRAND_CATEGORIES = [
   "Other",
 ];
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
   const { register } = useAuth();
 
   const [brandName, setBrandName] = useState("");
@@ -69,7 +71,7 @@ export default function RegisterPage() {
     setLoading(false);
 
     if (result.success) {
-      router.push("/events");
+      router.push(redirectUrl || "/events");
     } else {
       setErrorMessage(result.error || "Failed to create brand account.");
     }
@@ -99,6 +101,13 @@ export default function RegisterPage() {
 
         {/* Form Card */}
         <div className="bg-white p-7 sm:p-9 rounded-3xl border border-zinc-200/90 shadow-soft-md space-y-5">
+          {redirectUrl && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-bazarna-red shrink-0" />
+              <span>Please create your brand profile first to complete your event application.</span>
+            </div>
+          )}
+
           {errorMessage && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -233,7 +242,10 @@ export default function RegisterPage() {
           <div className="pt-3 border-t border-zinc-100 text-center">
             <p className="text-xs text-zinc-500">
               Already have an account?{" "}
-              <Link href="/login" className="font-bold text-zinc-900 hover:underline">
+              <Link
+                href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"}
+                className="font-bold text-zinc-900 hover:underline"
+              >
                 Sign In
               </Link>
             </p>
@@ -243,3 +255,18 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[85vh] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full border-2 border-bazarna-red border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
+  );
+}
+

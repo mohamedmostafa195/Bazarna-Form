@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { BazarnaStore } from "@/lib/store";
 import { BazarnaEvent } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 import {
   Calendar,
   MapPin,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 
 export default function EventDetailsPage() {
+  const { isLoggedIn } = useAuth();
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
@@ -262,7 +264,11 @@ export default function EventDetailsPage() {
                           </button>
                         ) : (
                           <Link
-                            href={`/events/${event.slug}/apply?pkg=${pkg.id}`}
+                            href={
+                              isLoggedIn
+                                ? `/events/${event.slug}/apply?pkg=${pkg.id}`
+                                : `/register?redirect=${encodeURIComponent(`/events/${event.slug}/apply?pkg=${pkg.id}`)}`
+                            }
                             className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold shadow-soft-sm transition"
                           >
                             <Package className="w-4 h-4 text-butter-300" />
@@ -337,15 +343,21 @@ export default function EventDetailsPage() {
               {event.status === "REGISTRATION_OPEN" ? (
                 <div className="space-y-3">
                   <Link
-                    href={`/events/${event.slug}/apply`}
+                    href={
+                      isLoggedIn
+                        ? `/events/${event.slug}/apply`
+                        : `/register?redirect=${encodeURIComponent(`/events/${event.slug}/apply`)}`
+                    }
                     className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-bazarna-red hover:bg-bazarna-darkred text-white font-black text-sm shadow-bazarna-glow transition transform hover:-translate-y-0.5"
                   >
                     <Sparkles className="w-4 h-4 text-butter-200" />
-                    Apply for this Event
+                    {isLoggedIn ? "Apply for this Event" : "Register Brand & Apply"}
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <p className="text-[11px] text-center text-zinc-500">
-                    Your saved brand profile will be automatically loaded into the application.
+                    {isLoggedIn
+                      ? "Your saved brand profile will be automatically loaded into the application."
+                      : "Brand registration required. Create your profile in under 1 minute to apply."}
                   </p>
                 </div>
               ) : (

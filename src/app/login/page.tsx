@@ -149,7 +149,7 @@ function LoginForm() {
             <p className="text-xs text-zinc-500">
               New brand to Bazarna?{" "}
               <Link
-                href="/register"
+                href={redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : "/register"}
                 className="font-bold text-bazarna-red hover:underline decoration-2"
               >
                 Create Brand Account

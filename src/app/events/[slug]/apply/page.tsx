@@ -81,10 +81,32 @@ export default function EventApplicationWizard() {
     }
   }, [slug, preselectedPkgId]);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isLoggedIn) {
+      const fullPath = window.location.pathname + window.location.search;
+      router.replace(`/register?redirect=${encodeURIComponent(fullPath)}`);
+    }
+  }, [mounted, isLoggedIn, router]);
+
   // Sync when currentBrand in auth context changes
   useEffect(() => {
     setBrandData({ ...currentBrand });
   }, [currentBrand]);
+
+  if (!mounted || !isLoggedIn) {
+    return (
+      <div className="max-w-4xl mx-auto py-24 text-center space-y-4">
+        <div className="w-12 h-12 rounded-full border-4 border-bazarna-red border-t-transparent animate-spin mx-auto" />
+        <p className="text-sm font-semibold text-zinc-500">Redirecting to Brand Registration...</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -14,8 +14,7 @@ export const INITIAL_EVENTS: BazarnaEvent[] = [
       "Live Acoustic & DJ Sets throughout the day",
       "Official Bazarna marketing campaign reaching 250k+ fashion enthusiasts",
     ],
-    coverImage:
-      "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&w=1600&q=80",
+    coverImage: "/images/bazarna-symbol.png",
     location: "Downtown Katameya Mall, New Cairo, Egypt",
     googleMapsUrl: "https://maps.google.com/?q=Downtown+Katameya+Mall+New+Cairo",
     startDate: "2026-09-18T11:00:00.000Z",

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { BazarnaStore } from "@/lib/store";
 import { BazarnaEvent, EventStatus } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 import {
   Calendar,
   MapPin,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 export default function EventsPage() {
+  const { isLoggedIn } = useAuth();
   const [events, setEvents] = useState<BazarnaEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -162,87 +164,91 @@ export default function EventsPage() {
             return (
               <div
                 key={event.id}
-                className="group flex flex-col rounded-3xl bg-white border border-zinc-200/90 shadow-soft-md hover:shadow-soft-xl hover:-translate-y-1 transition duration-300 overflow-hidden"
+                className="group flex flex-col rounded-2xl bg-white border border-zinc-200/90 shadow-soft-sm hover:shadow-soft-md hover:-translate-y-1 transition duration-300 overflow-hidden max-w-sm"
               >
                 {/* Image Cover */}
-                <div className="relative h-52 w-full overflow-hidden bg-zinc-100">
+                <div className="relative w-full aspect-[4/3] overflow-hidden bg-zinc-100">
                   <img
                     src={event.coverImage}
                     alt={event.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    className="w-full h-full object-cover object-center transition duration-300"
                   />
-                  <div className="absolute top-4 left-4">{getStatusBadge(event.status)}</div>
-                  <div className="absolute bottom-3 right-3 bg-zinc-950/80 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-[11px] font-semibold">
+                  <div className="absolute top-3 left-3">{getStatusBadge(event.status)}</div>
+                  <div className="absolute bottom-2.5 right-2.5 bg-zinc-950/80 backdrop-blur-md text-white px-2 py-0.5 rounded-md text-[10px] font-semibold">
                     {event.capacity} Brand Spots
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
-                  <div className="space-y-3">
-                    <h3 className="text-xl font-normal font-display text-zinc-950 group-hover:text-bazarna-red transition leading-tight uppercase tracking-wide">
+                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3.5">
+                  <div className="space-y-2">
+                    <h3 className="text-base font-bold font-display text-zinc-950 group-hover:text-bazarna-red transition leading-snug uppercase tracking-wide">
                       {event.name}
                     </h3>
 
-                    <div className="space-y-1.5 text-xs text-zinc-600">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <div className="space-y-1 text-xs text-zinc-600">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-zinc-400 shrink-0" />
                         <span className="truncate">{event.location}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3 text-zinc-400 shrink-0" />
                         <span>{startDateFormatted}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-zinc-400 shrink-0" />
                         <span>{event.startTime} – {event.endTime}</span>
                       </div>
                     </div>
 
-                    <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                    <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
                       {event.description}
                     </p>
                   </div>
 
                   {/* Footer card info */}
-                  <div className="pt-4 border-t border-zinc-100 flex flex-col gap-3">
+                  <div className="pt-3 border-t border-zinc-100 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <div>
-                        <span className="text-[10px] text-zinc-400 uppercase font-semibold block">
+                        <span className="text-[9px] text-zinc-400 uppercase font-semibold block">
                           Packages
                         </span>
-                        <span className="font-bold text-zinc-900">
+                        <span className="font-bold text-zinc-900 text-xs">
                           {minPrice ? `From ${minPrice} EGP` : "TBA"}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-zinc-400 uppercase font-semibold block">
+                        <span className="text-[9px] text-zinc-400 uppercase font-semibold block">
                           Deadline
                         </span>
-                        <span className="font-semibold text-bazarna-red">{regCloseFormatted}</span>
+                        <span className="font-semibold text-bazarna-red text-xs">{regCloseFormatted}</span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
                       <Link
                         href={`/events/${event.slug}`}
-                        className="w-full inline-flex items-center justify-center py-2.5 px-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-800 transition"
+                        className="w-full inline-flex items-center justify-center py-2 px-2.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-[11px] font-bold text-zinc-800 transition"
                       >
                         View Event
                       </Link>
 
                       {event.status === "REGISTRATION_OPEN" ? (
                         <Link
-                          href={`/events/${event.slug}/apply`}
-                          className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-bazarna-red hover:bg-bazarna-darkred text-white text-xs font-bold shadow-bazarna-glow transition"
+                          href={
+                            isLoggedIn
+                              ? `/events/${event.slug}/apply`
+                              : `/register?redirect=${encodeURIComponent(`/events/${event.slug}/apply`)}`
+                          }
+                          className="w-full inline-flex items-center justify-center gap-1 py-2 px-2.5 rounded-lg bg-bazarna-red hover:bg-bazarna-darkred text-white text-[11px] font-bold shadow-bazarna-glow transition"
                         >
                           Apply Now
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          <ArrowRight className="w-3 h-3" />
                         </Link>
                       ) : (
                         <button
                           disabled
-                          className="w-full py-2.5 px-3 rounded-xl bg-zinc-100 text-zinc-400 text-xs font-semibold cursor-not-allowed"
+                          className="w-full py-2 px-2.5 rounded-lg bg-zinc-100 text-zinc-400 text-[11px] font-semibold cursor-not-allowed"
                         >
                           {event.status === "UPCOMING" ? "Opening Soon" : "Closed"}
                         </button>
