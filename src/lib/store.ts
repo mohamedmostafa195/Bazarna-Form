@@ -51,31 +51,120 @@ const INITIAL_USERS: UserAccount[] = [
   },
 ];
 
+// Memory cache to ensure uninterrupted state even if localStorage is restricted/full
+const memoryCache: Record<string, any> = {};
+
+// Clean heavy data (e.g. huge base64 images) before persisting to localStorage
+function sanitizeForLocalStorage<T>(key: string, data: T): T {
+  if (!data) return data;
+  try {
+    if (key === STORAGE_KEYS.EVENTS && Array.isArray(data)) {
+      return data.map((evt: any) => {
+        if (
+          evt.coverImage &&
+          typeof evt.coverImage === "string" &&
+          evt.coverImage.startsWith("data:") &&
+          evt.coverImage.length > 50000
+        ) {
+          return {
+            ...evt,
+            coverImage: "/images/bazarna-symbol.png",
+          };
+        }
+        return evt;
+      }) as unknown as T;
+    }
+
+    if (key === STORAGE_KEYS.APPLICATIONS && Array.isArray(data)) {
+      return data.map((app: any) => {
+        if (
+          app.payment?.receiptFileUrl &&
+          typeof app.payment.receiptFileUrl === "string" &&
+          app.payment.receiptFileUrl.startsWith("data:") &&
+          app.payment.receiptFileUrl.length > 50000
+        ) {
+          return {
+            ...app,
+            payment: {
+              ...app.payment,
+              receiptFileUrl: "/images/receipt-placeholder.png",
+            },
+          };
+        }
+        return app;
+      }) as unknown as T;
+    }
+
+    if (key === STORAGE_KEYS.BRANDS && Array.isArray(data)) {
+      return data.map((brand: any) => {
+        if (brand.documents && Array.isArray(brand.documents)) {
+          const cleanDocs = brand.documents.map((doc: any) => {
+            if (
+              doc.fileUrl &&
+              typeof doc.fileUrl === "string" &&
+              doc.fileUrl.startsWith("data:") &&
+              doc.fileUrl.length > 50000
+            ) {
+              return { ...doc, fileUrl: "" };
+            }
+            return doc;
+          });
+          return { ...brand, documents: cleanDocs };
+        }
+        return brand;
+      }) as unknown as T;
+    }
+  } catch (e) {
+    console.warn("Error sanitizing data for storage:", e);
+  }
+  return data;
+}
+
 // Safe localStorage helper
 function getStored<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
+  if (memoryCache[key] !== undefined) {
+    return memoryCache[key];
+  }
   try {
     const item = localStorage.getItem(key);
     if (!item) {
-      localStorage.setItem(key, JSON.stringify(fallback));
+      memoryCache[key] = fallback;
       return fallback;
     }
-    return JSON.parse(item);
+    const parsed = JSON.parse(item);
+    memoryCache[key] = parsed;
+    return parsed;
   } catch (err) {
     console.error(`Error reading ${key} from localStorage:`, err);
+    memoryCache[key] = fallback;
     return fallback;
   }
 }
 
 function setStored<T>(key: string, data: T): void {
+  // Always keep in memory cache
+  memoryCache[key] = data;
+
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(key, JSON.stringify(data));
-    // Dispatch custom storage event so other components update reactively
-    window.dispatchEvent(new Event("bazarna_store_updated"));
+    const sanitized = sanitizeForLocalStorage(key, data);
+    localStorage.setItem(key, JSON.stringify(sanitized));
   } catch (err) {
-    console.error(`Error saving ${key} to localStorage:`, err);
+    console.warn(`localStorage quota exceeded for ${key}. Data safely kept in memory.`, err);
+    try {
+      // Clear non-critical caches to free quota if needed
+      if (key !== STORAGE_KEYS.CURRENT_USER && key !== STORAGE_KEYS.CURRENT_BRAND) {
+        localStorage.removeItem(STORAGE_KEYS.EVENTS);
+        localStorage.removeItem(STORAGE_KEYS.APPLICATIONS);
+      }
+    } catch (_) {}
   }
+
+  // Dispatch custom storage event so other components update reactively
+  try {
+    window.dispatchEvent(new Event("bazarna_store_updated"));
+  } catch (_) {}
 }
 
 // Background sync with MongoDB Atlas
@@ -761,11 +850,39 @@ export const BazarnaStore = {
   },
 
   getCurrentUser(): UserAccount | null {
-    return getStored<UserAccount | null>(STORAGE_KEYS.CURRENT_USER, null);
+    if (memoryCache[STORAGE_KEYS.CURRENT_USER] !== undefined) {
+      return memoryCache[STORAGE_KEYS.CURRENT_USER];
+    }
+    const user = getStored<UserAccount | null>(STORAGE_KEYS.CURRENT_USER, null);
+    if (user) {
+      memoryCache[STORAGE_KEYS.CURRENT_USER] = user;
+      return user;
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const sess = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (sess) {
+          const parsed = JSON.parse(sess);
+          memoryCache[STORAGE_KEYS.CURRENT_USER] = parsed;
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return null;
   },
 
   setCurrentUser(user: UserAccount | null): void {
+    memoryCache[STORAGE_KEYS.CURRENT_USER] = user;
     setStored(STORAGE_KEYS.CURRENT_USER, user);
+    if (typeof window !== "undefined") {
+      try {
+        if (user) {
+          sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+        } else {
+          sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        }
+      } catch (e) {}
+    }
   },
 
   authenticate(email: string, password: string): UserAccount | null {

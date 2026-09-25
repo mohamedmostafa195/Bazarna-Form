@@ -50,8 +50,8 @@ function LoginForm() {
       ) {
         router.push("/admin");
       } else {
-        // If Brand -> Go to Home (which displays Curated Pop-Up Calendar when logged in) or original redirect URL
-        router.push(redirectUrl || "/");
+        // If Brand -> Go to Events (Curated Pop-Up Calendar) or original redirect URL
+        router.push(redirectUrl || "/events");
       }
     } else {
       setErrorMessage(result.error || "Authentication failed.");

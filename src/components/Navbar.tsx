@@ -171,7 +171,7 @@ export function Navbar() {
                     ) : (
                       <div className="relative">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-bazarna-red to-rose-700 text-white flex items-center justify-center font-black text-sm shadow-soft-xs ring-2 ring-red-100/60">
-                          {(currentBrand.brandName || user?.name || "B").charAt(0).toUpperCase()}
+                          {(currentBrand?.brandName || user?.name || "B").charAt(0).toUpperCase()}
                         </div>
                         <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                       </div>
@@ -179,10 +179,10 @@ export function Navbar() {
 
                     <div className="flex flex-col">
                       <span className="text-xs font-black text-zinc-950 capitalize max-w-[140px] truncate leading-tight">
-                        {isAdmin ? user?.name || "Operations Admin" : currentBrand.brandName || user?.name}
+                        {isAdmin ? user?.name || "Operations Admin" : currentBrand?.brandName || user?.name}
                       </span>
                       <span className="text-[10px] font-semibold text-zinc-400 leading-tight">
-                        {isAdmin ? "Admin Portal" : currentBrand.category || "Brand Account"}
+                        {isAdmin ? "Admin Portal" : currentBrand?.category || "Brand Account"}
                       </span>
                     </div>
 
@@ -199,18 +199,18 @@ export function Navbar() {
                           </div>
                         ) : (
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-bazarna-red to-rose-700 text-white flex items-center justify-center font-black text-base shrink-0 ring-2 ring-red-100">
-                            {(currentBrand.brandName || user?.name || "B").charAt(0).toUpperCase()}
+                            {(currentBrand?.brandName || user?.name || "B").charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div className="overflow-hidden">
                           <div className="text-xs font-bold text-zinc-950 truncate">
-                            {isAdmin ? user?.name || "Admin" : currentBrand.brandName || user?.name}
+                            {isAdmin ? user?.name || "Admin" : currentBrand?.brandName || user?.name}
                           </div>
                           <div className="text-[11px] text-zinc-400 truncate">
                             {user?.email}
                           </div>
                           <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-                            {isAdmin ? "Super Admin" : currentBrand.category || "Verified Brand"}
+                            {isAdmin ? "Super Admin" : currentBrand?.category || "Verified Brand"}
                           </span>
                         </div>
                       </div>
