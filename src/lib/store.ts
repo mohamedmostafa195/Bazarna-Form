@@ -19,6 +19,7 @@ import {
   INITIAL_APPLICATIONS,
   INITIAL_AUDIT_LOGS,
 } from "./seed-data";
+import { arePhoneNumbersEqual } from "./phone-utils";
 
 const STORAGE_KEYS = {
   EVENTS: "bazarna_events_v1",
@@ -992,6 +993,23 @@ export const BazarnaStore = {
     contactPhone: string;
   }): { user: UserAccount; brand: BrandProfile } {
     const brands = this.getBrands();
+    const users = this.getUsers();
+    const cleanEmail = params.email.toLowerCase().trim();
+    const cleanPhone = params.contactPhone.trim();
+
+    if (
+      users.some((u) => u.email.toLowerCase().trim() === cleanEmail) ||
+      brands.some((b) => b.contactEmail?.toLowerCase().trim() === cleanEmail)
+    ) {
+      throw new Error("An account with this email address already exists. / البريد الإلكتروني مسجل بالفعل.");
+    }
+
+    if (brands.some((b) => arePhoneNumbersEqual(b.contactPhone, cleanPhone))) {
+      throw new Error(
+        "This mobile phone number is already registered to another brand account. / رقم الهاتف المحمول مسجل بالفعل."
+      );
+    }
+
     const newBrandId = `brand-${Date.now()}`;
     const newUserId = `usr-${Date.now()}`;
 
@@ -1023,7 +1041,6 @@ export const BazarnaStore = {
       createdAt: new Date().toISOString(),
     };
 
-    const users = this.getUsers();
     users.unshift(newUser);
     setStored(STORAGE_KEYS.USERS, users);
 

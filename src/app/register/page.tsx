@@ -54,6 +54,27 @@ function RegisterForm() {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setErrorMessage("Please enter a valid email address (e.g. name@brand.com).");
+      return;
+    }
+
+    const cleanPhoneDigits = contactPhone.replace(/\D/g, "");
+    if (cleanPhoneDigits.length !== 11) {
+      setErrorMessage(
+        "Phone / WhatsApp must be exactly 11 digits (e.g. 01012345678). / رقم الهاتف يجب أن يتكون من 11 رقماً بالضبط."
+      );
+      return;
+    }
+
+    if (!/^01[0125][0-9]{8}$/.test(cleanPhoneDigits)) {
+      setErrorMessage(
+        "Please enter a valid Egyptian mobile number starting with 010, 011, 012, or 015. / يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ 01."
+      );
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMessage("Password must be at least 6 characters.");
       return;
@@ -172,17 +193,27 @@ function RegisterForm() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-800">
-                  Phone / WhatsApp <span className="text-rose-500">*</span>
+                <label className="text-xs font-bold text-zinc-800 flex justify-between items-center">
+                  <span>
+                    Phone / WhatsApp <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono font-normal">
+                    {contactPhone.length}/11
+                  </span>
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={11}
                     value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="+20 100 123 4567"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-medium focus:ring-2 focus:ring-zinc-900 transition"
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      setContactPhone(digits);
+                    }}
+                    placeholder="01012345678"
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-medium focus:ring-2 focus:ring-zinc-900 transition font-mono tracking-wider"
                     required
                   />
                 </div>

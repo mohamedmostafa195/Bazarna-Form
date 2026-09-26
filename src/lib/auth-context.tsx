@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { UserRole, BrandProfile, UserAccount } from "./types";
 import { BazarnaStore } from "./store";
+import { arePhoneNumbersEqual } from "./phone-utils";
 
 interface ToastMessage {
   id: string;
@@ -148,23 +149,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Server unavailable, trying local registration");
       }
       return { success: false, error: data.error || "Failed to create account." };
-    } catch (err) {
+    } catch (err: any) {
       // Local fallback
+      const cleanEmail = params.email.toLowerCase().trim();
       const existingUsers = BazarnaStore.getUsers();
-      if (existingUsers.some((u) => u.email.toLowerCase() === params.email.toLowerCase().trim())) {
-        return { success: false, error: "An account with this email already exists." };
+      const existingBrands = BazarnaStore.getBrands();
+
+      if (
+        existingUsers.some((u) => u.email.toLowerCase().trim() === cleanEmail) ||
+        existingBrands.some((b) => b.contactEmail?.toLowerCase().trim() === cleanEmail)
+      ) {
+        return {
+          success: false,
+          error: "An account with this email address already exists. / هذا البريد الإلكتروني مسجل بالفعل.",
+        };
       }
 
-      const { user: newUser, brand: newBrand } = BazarnaStore.registerBrand(params);
-      setUser(newUser);
-      setRoleState(newUser.role);
-      BazarnaStore.setCurrentUser(newUser);
-      BazarnaStore.saveBrand(newBrand);
-      BazarnaStore.setCurrentBrand(newBrand.id);
-      setCurrentBrandState(newBrand);
-      setAvailableBrands(BazarnaStore.getBrands());
-      addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${newBrand.brandName}!`);
-      return { success: true, user: newUser };
+      if (existingBrands.some((b) => arePhoneNumbersEqual(b.contactPhone, params.contactPhone))) {
+        return {
+          success: false,
+          error:
+            "This mobile phone number is already registered to another brand account. / رقم الهاتف المحمول مسجل بالفعل لحساب آخر.",
+        };
+      }
+
+      try {
+        const { user: newUser, brand: newBrand } = BazarnaStore.registerBrand(params);
+        setUser(newUser);
+        setRoleState(newUser.role);
+        BazarnaStore.setCurrentUser(newUser);
+        BazarnaStore.saveBrand(newBrand);
+        BazarnaStore.setCurrentBrand(newBrand.id);
+        setCurrentBrandState(newBrand);
+        setAvailableBrands(BazarnaStore.getBrands());
+        addToast("success", "Brand Account Created 🎉", `Welcome to Bazarna, ${newBrand.brandName}!`);
+        return { success: true, user: newUser };
+      } catch (storeErr: any) {
+        return { success: false, error: storeErr?.message || "Failed to create account." };
+      }
     }
   };
 

@@ -433,10 +433,15 @@ export default function BrandProfilePage() {
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
                   value={formData.contactPhone}
-                  onChange={(e) => handleTextChange("contactPhone", e.target.value)}
-                  placeholder="+20 100 000 0000"
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-bazarna-red/30"
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    handleTextChange("contactPhone", digits);
+                  }}
+                  placeholder="01012345678"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-bazarna-red/30 font-mono tracking-wide"
                 />
               </div>
             </div>
