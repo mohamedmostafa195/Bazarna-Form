@@ -277,42 +277,64 @@ export default function EventApplicationWizard() {
     }
   };
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          brandData.brandName.trim().length > 0 &&
-          brandData.category.trim().length > 0 &&
-          (brandData.aboutBrand || "").trim().length > 0 &&
-          (brandData.products || "").trim().length > 0 &&
-          (brandData.instagram || "").trim().length > 0 &&
-          (brandData.website || "").trim().length > 0
-        );
-      case 2: {
-        const cleanNationalId = (brandData.nationalId || "").replace(/\D/g, "");
-        return (
-          brandData.contactName.trim().length > 0 &&
-          brandData.contactEmail.trim().length > 0 &&
-          brandData.contactPhone.trim().length > 0 &&
-          cleanNationalId.length === 14
-        );
+  const getMissingFields = (step: number): string[] => {
+    const missing: string[] = [];
+    if (step === 1) {
+      if (!brandData.brandName?.trim()) missing.push("Brand Name");
+      if (!brandData.category?.trim()) missing.push("Category");
+      if (!brandData.aboutBrand?.trim()) missing.push("About Brand");
+      if (!brandData.products?.trim()) missing.push("Products Being Displayed");
+      if (!brandData.instagram?.trim()) missing.push("Instagram Handle / URL");
+      if (!brandData.website?.trim()) missing.push("Website URL");
+    } else if (step === 2) {
+      if (!brandData.contactName?.trim()) missing.push("Contact Person Name (اسم ثلاثي)");
+      if (!brandData.contactEmail?.trim()) missing.push("Contact Email");
+      if (!brandData.contactPhone?.trim()) missing.push("Mobile Number (رقم التليفون)");
+      if (!brandData.taxId?.trim()) missing.push("Tax ID Number (الرقم الضريبي)");
+      const cleanNationalId = (brandData.nationalId || "").replace(/\D/g, "");
+      if (cleanNationalId.length !== 14) {
+        missing.push("National ID Number (must be exactly 14 digits)");
       }
-      case 3:
-        return true; // Optional or pre-filled
-      case 4:
-        return true;
-      case 5:
-        return !!selectedPackage && selectedPackage.remainingQty > 0;
-      case 6:
-        return true; // Can submit as pending receipt or with receipt
-      case 7:
-        return true;
-      case 8:
-        return tcAccepted;
-      default:
-        return true;
+    } else if (step === 3) {
+      const hasTaxDoc = brandData.documents?.some((d) => d.documentType === "TAX_ID_CARD" && d.fileUrl);
+      const hasNationalDoc = brandData.documents?.some((d) => d.documentType === "NATIONAL_ID" && d.fileUrl);
+      if (!hasTaxDoc) missing.push("Tax ID Card Scan (صورة البطاقة الضريبية)");
+      if (!hasNationalDoc) missing.push("National ID Scan (صورة البطاقة الشخصية)");
+    } else if (step === 4) {
+      if (prParticipation === undefined || prParticipation === null) {
+        missing.push("PR Campaign Participation Choice");
+      }
+    } else if (step === 5) {
+      if (!selectedPackage || selectedPackage.remainingQty <= 0) {
+        missing.push("Exhibiting Package Selection");
+      }
+    } else if (step === 6) {
+      if (!receiptFile || !receiptFile.url) {
+        missing.push("Payment Transfer Receipt (صورة إيصال التحويل)");
+      }
+    } else if (step === 7) {
+      if (!notes?.trim()) {
+        missing.push("Notes & Special Requests (or write 'None' / 'لا يوجد')");
+      }
+      if (event?.questions) {
+        for (const q of event.questions) {
+          if (q.isRequired && !customAnswers[q.id]?.trim()) {
+            missing.push(q.questionText);
+          }
+        }
+      }
+    } else if (step === 8) {
+      if (!tcAccepted) {
+        missing.push("Accept Terms & Conditions");
+      }
     }
+    return missing;
   };
+
+  const canProceed = () => {
+    return getMissingFields(currentStep).length === 0;
+  };
+
 
   const handleFinalSubmit = () => {
     if (!tcAccepted) {
@@ -566,10 +588,11 @@ export default function EventApplicationWizard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-zinc-100">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-zinc-800">
-                TAX ID Number (الرقم الضريبي)
+                TAX ID Number (الرقم الضريبي) <span className="text-bazarna-red">*</span>
               </label>
               <input
                 type="text"
+                required
                 value={brandData.taxId || ""}
                 onChange={(e) => setBrandData({ ...brandData, taxId: e.target.value })}
                 placeholder="e.g. 492-819-204"
@@ -642,13 +665,17 @@ export default function EventApplicationWizard() {
               return (
                 <div className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-900">Tax ID Card (صورة البطاقة الضريبيه)</span>
+                    <span className="text-xs font-bold text-zinc-900">
+                      Tax ID Card (صورة البطاقة الضريبيه) <span className="text-bazarna-red">*</span>
+                    </span>
                     {doc ? (
-                      <span className="text-[10px] font-bold text-bazarna-red bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                        Attached
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Attached ✓
                       </span>
                     ) : (
-                      <span className="text-[10px] font-medium text-zinc-400">Not Uploaded</span>
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                        Required *
+                      </span>
                     )}
                   </div>
 
@@ -671,7 +698,7 @@ export default function EventApplicationWizard() {
 
                   <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-800 transition">
                     <Upload className="w-3.5 h-3.5 text-zinc-500" />
-                    {doc ? "Replace Document" : "Upload Tax Card"}
+                    {doc ? "Replace Document" : "Upload Tax Card *"}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,application/pdf"
@@ -689,13 +716,17 @@ export default function EventApplicationWizard() {
               return (
                 <div className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-900">National ID (صورة البطاقة الشخصية)</span>
+                    <span className="text-xs font-bold text-zinc-900">
+                      National ID (صورة البطاقة الشخصية) <span className="text-bazarna-red">*</span>
+                    </span>
                     {doc ? (
-                      <span className="text-[10px] font-bold text-bazarna-red bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                        Attached
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Attached ✓
                       </span>
                     ) : (
-                      <span className="text-[10px] font-medium text-zinc-400">Not Uploaded</span>
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                        Required *
+                      </span>
                     )}
                   </div>
 
@@ -979,9 +1010,15 @@ export default function EventApplicationWizard() {
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-zinc-800">
-                Upload Full Payment Receipt (صورة إيصال التحويل)
+                Upload Full Payment Receipt (صورة إيصال التحويل) <span className="text-bazarna-red">*</span>
               </label>
-              <span className="text-[11px] text-zinc-400">JPG, PNG, PDF (Max 10MB)</span>
+              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                receiptFile
+                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                  : "text-rose-600 bg-rose-50 border-rose-200"
+              }`}>
+                {receiptFile ? "Attached ✓" : "Mandatory / إجباري *"}
+              </span>
             </div>
 
             {receiptFile ? (
@@ -1013,10 +1050,10 @@ export default function EventApplicationWizard() {
               <label className="cursor-pointer border-2 border-dashed border-zinc-300 hover:border-bazarna-red/60 rounded-2xl p-8 flex flex-col items-center justify-center gap-2 text-center transition bg-zinc-50/50 hover:bg-white">
                 <Upload className="w-6 h-6 text-zinc-400" />
                 <span className="text-xs font-bold text-zinc-800">
-                  Click to choose or drag and drop your payment receipt
+                  Click to choose or drag and drop your payment receipt *
                 </span>
                 <span className="text-[11px] text-zinc-500">
-                  You can also upload your receipt later from your Brand Dashboard.
+                  Full payment receipt upload is required to confirm and submit your booking.
                 </span>
                 <input
                   type="file"
@@ -1032,23 +1069,84 @@ export default function EventApplicationWizard() {
 
       {/* STEP 7: NOTES & SPECIAL REQUESTS */}
       {currentStep === 7 && (
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-zinc-200/90 shadow-soft-md space-y-4 animate-in fade-in">
-          <h3 className="text-base font-bold text-zinc-950 font-display">
-            Notes & Special Requests
-          </h3>
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-zinc-200/90 shadow-soft-md space-y-6 animate-in fade-in">
+          <div>
+            <h3 className="text-base font-bold text-zinc-950 font-display">
+              Notes & Special Requests <span className="text-bazarna-red">*</span>
+            </h3>
+            <p className="text-xs text-zinc-500 mt-1">
+              Please enter any special requests or write &quot;None&quot; / &quot;لا يوجد&quot; if you do not have any requests.
+            </p>
+          </div>
 
           <div className="space-y-2">
             <textarea
               rows={4}
+              required
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Special requests such as electricity requirements, neighbor booth preference,.. etc )"
+              placeholder="Special requests such as electricity requirements, neighbor booth preference (or write 'None' / 'لا يوجد')..."
               className="w-full px-4 py-3.5 rounded-2xl border border-zinc-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900 transition text-zinc-900 shadow-soft-xs"
             />
             <p className="text-xs text-zinc-600">
               All special requests are subject to availability or extra fees
             </p>
           </div>
+
+          {/* Event Custom Questions (if any) */}
+          {event.questions && event.questions.length > 0 && (
+            <div className="pt-4 border-t border-zinc-100 space-y-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+                Event Specific Questions
+              </h4>
+              <div className="space-y-4">
+                {event.questions.map((q) => (
+                  <div key={q.id} className="space-y-1.5">
+                    <label className="text-xs font-bold text-zinc-800 flex items-center justify-between">
+                      <span>{q.questionText} {q.isRequired && <span className="text-bazarna-red">*</span>}</span>
+                      {q.isRequired && !customAnswers[q.id]?.trim() && (
+                        <span className="text-[10px] text-rose-500 font-semibold">Required</span>
+                      )}
+                    </label>
+                    {q.questionType === "YES_NO" ? (
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setCustomAnswers({ ...customAnswers, [q.id]: "Yes" })}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
+                            customAnswers[q.id] === "Yes"
+                              ? "bg-zinc-950 text-white border-zinc-950"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                          }`}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCustomAnswers({ ...customAnswers, [q.id]: "No" })}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${
+                            customAnswers[q.id] === "No"
+                              ? "bg-zinc-950 text-white border-zinc-950"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                          }`}
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type={q.questionType === "NUMBER" ? "number" : "text"}
+                        value={customAnswers[q.id] || ""}
+                        onChange={(e) => setCustomAnswers({ ...customAnswers, [q.id]: e.target.value })}
+                        placeholder="Your answer..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-bazarna-red/30"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1090,8 +1188,23 @@ export default function EventApplicationWizard() {
         </div>
       )}
 
+      {/* Missing Fields Warning Banner */}
+      {getMissingFields(currentStep).length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/90 text-xs text-amber-900 flex items-start gap-2.5 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-bold block text-amber-950">
+              يرجى إكمال الحقول الإلزامية المطلوبة في هذه الخطوة:
+            </span>
+            <span className="text-[11px] text-amber-800 leading-relaxed block">
+              {getMissingFields(currentStep).join(" • ")}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Wizard Footer Navigation Controls */}
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex items-center justify-between pt-2">
         {currentStep > 1 ? (
           <button
             type="button"
@@ -1109,19 +1222,23 @@ export default function EventApplicationWizard() {
           <button
             type="button"
             onClick={() => {
-              if (canProceed()) {
+              const missing = getMissingFields(currentStep);
+              if (missing.length === 0) {
                 setCurrentStep((prev) => prev + 1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               } else {
                 addToast(
                   "error",
-                  "All Fields Required",
-                  "Please fill in all required inputs before proceeding to the next step."
+                  "Missing Required Information",
+                  `Please complete: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "..." : ""}`
                 );
               }
             }}
-            disabled={!canProceed()}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold shadow-soft-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white text-xs font-bold shadow-soft-sm transition cursor-pointer ${
+              canProceed()
+                ? "bg-zinc-950 hover:bg-zinc-800 shadow-soft-md"
+                : "bg-zinc-400 hover:bg-zinc-500"
+            }`}
           >
             Next Step
             <ArrowRight className="w-4 h-4" />
