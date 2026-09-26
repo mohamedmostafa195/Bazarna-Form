@@ -23,13 +23,18 @@ import {
 } from "lucide-react";
 
 export default function EventDetailsPage() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, currentBrand } = useAuth();
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
 
   const [event, setEvent] = useState<BazarnaEvent | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const existingApplication =
+    event && currentBrand && isLoggedIn
+      ? BazarnaStore.getApplicationForEvent(currentBrand, event.id)
+      : undefined;
 
   useEffect(() => {
     if (slug) {
@@ -255,7 +260,15 @@ export default function EventDetailsPage() {
                       </div>
 
                       <div className="pt-6">
-                        {isSoldOut ? (
+                        {existingApplication ? (
+                          <Link
+                            href={`/dashboard/applications/${existingApplication.id}`}
+                            className="w-full inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl bg-kiwi-50 hover:bg-kiwi-100 text-kiwi-800 border border-kiwi-200 text-xs font-bold transition shadow-soft-xs"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-kiwi-600" />
+                            Already Subscribed
+                          </Link>
+                        ) : isSoldOut ? (
                           <button
                             disabled
                             className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 text-xs font-bold cursor-not-allowed"
@@ -340,7 +353,30 @@ export default function EventDetailsPage() {
               </div>
 
               {/* Primary CTA */}
-              {event.status === "REGISTRATION_OPEN" ? (
+              {existingApplication ? (
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl bg-kiwi-50 border border-kiwi-200 text-xs space-y-1.5">
+                    <span className="font-bold text-kiwi-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-kiwi-600" />
+                      Already Subscribed & Registered
+                    </span>
+                    <p className="text-[11px] text-kiwi-700 leading-relaxed">
+                      Your brand is already registered for this event.
+                      <br />
+                      Application Code: <strong className="font-mono text-zinc-950">{existingApplication.applicationCode}</strong>
+                      <br />
+                      Status: <strong className="text-zinc-900">{existingApplication.appStatus.replace("_", " ")}</strong>
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/applications/${existingApplication.id}`}
+                    className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-kiwi-600 hover:bg-kiwi-700 text-white font-black text-sm shadow-kiwi-glow transition transform hover:-translate-y-0.5"
+                  >
+                    View Application Status
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : event.status === "REGISTRATION_OPEN" ? (
                 <div className="space-y-3">
                   <Link
                     href={

@@ -61,6 +61,7 @@ export default function EventApplicationWizard() {
   const [prParticipation, setPrParticipation] = useState<boolean>(true);
   const [paymentMethod, setPaymentMethod] = useState<string>("BANK_TRANSFER");
   const [receiptFile, setReceiptFile] = useState<{ url: string; name: string } | null>(null);
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
   const [notes, setNotes] = useState<string>("");
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   const [tcAccepted, setTcAccepted] = useState<boolean>(false);
@@ -125,6 +126,88 @@ export default function EventApplicationWizard() {
         <Link href="/events" className="text-xs font-bold text-bazarna-red underline">
           Return to Events
         </Link>
+      </div>
+    );
+  }
+
+  const existingApplication =
+    event && currentBrand
+      ? BazarnaStore.getApplicationForEvent(currentBrand, event.id)
+      : null;
+
+  if (existingApplication && event) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6 animate-in fade-in">
+        <div className="w-16 h-16 rounded-3xl bg-kiwi-100 text-kiwi-700 flex items-center justify-center mx-auto shadow-kiwi-glow">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+
+        <div className="space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-kiwi-100 text-kiwi-800 border border-kiwi-300">
+            Already Subscribed
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 font-display">
+            You Have Already Applied for This Event!
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-600 max-w-md mx-auto">
+            Your brand <strong className="text-zinc-900">{currentBrand?.brandName}</strong> already has an active application for <strong className="text-zinc-900">{event.name}</strong>. Re-subscribing to the same event is not permitted.
+          </p>
+        </div>
+
+        {/* Details Card */}
+        <div className="bg-white p-6 rounded-3xl border border-zinc-200/90 shadow-soft-sm text-left space-y-3 text-xs">
+          <div className="flex justify-between items-center pb-3 border-b border-zinc-100">
+            <span className="text-zinc-500 font-semibold">Application Code:</span>
+            <span className="font-mono font-black text-zinc-950 bg-zinc-100 px-2.5 py-1 rounded-lg">
+              {existingApplication.applicationCode}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-zinc-500 font-semibold">Application Status:</span>
+            <span className="font-bold text-xs px-2.5 py-0.5 rounded-full bg-butter-100 text-butter-800">
+              {existingApplication.appStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-zinc-500 font-semibold">Package Selected:</span>
+            <span className="font-bold text-zinc-900">{existingApplication.package?.name}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-zinc-500 font-semibold">Payment Status:</span>
+            <span className="font-bold text-zinc-900">{existingApplication.paymentStatus.replace("_", " ")}</span>
+          </div>
+          {existingApplication.assignedBooth && (
+            <div className="flex justify-between items-center pt-2 border-t border-zinc-100">
+              <span className="text-zinc-500 font-semibold">Assigned Booth:</span>
+              <span className="font-mono font-bold text-kiwi-700 bg-kiwi-50 px-2.5 py-0.5 rounded-lg border border-kiwi-200">
+                {existingApplication.assignedBooth}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <Link
+            href={`/dashboard/applications/${existingApplication.id}`}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-kiwi-600 hover:bg-kiwi-700 text-white font-bold text-xs shadow-kiwi-glow transition"
+          >
+            <Eye className="w-4 h-4" />
+            View Application Dossier
+          </Link>
+          <Link
+            href="/dashboard/applications"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-bold text-xs shadow-soft-sm transition"
+          >
+            My Applications
+          </Link>
+          <Link
+            href="/events"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-transparent text-zinc-600 hover:text-zinc-950 font-bold text-xs transition"
+          >
+            Browse Other Events
+          </Link>
+        </div>
       </div>
     );
   }
@@ -205,12 +288,15 @@ export default function EventApplicationWizard() {
           (brandData.instagram || "").trim().length > 0 &&
           (brandData.website || "").trim().length > 0
         );
-      case 2:
+      case 2: {
+        const cleanNationalId = (brandData.nationalId || "").replace(/\D/g, "");
         return (
           brandData.contactName.trim().length > 0 &&
           brandData.contactEmail.trim().length > 0 &&
-          brandData.contactPhone.trim().length > 0
+          brandData.contactPhone.trim().length > 0 &&
+          cleanNationalId.length === 14
         );
+      }
       case 3:
         return true; // Optional or pre-filled
       case 4:
@@ -231,6 +317,20 @@ export default function EventApplicationWizard() {
   const handleFinalSubmit = () => {
     if (!tcAccepted) {
       addToast("error", "Accept Terms", "You must agree to the Terms & Conditions to complete registration.");
+      return;
+    }
+
+    if (!event) return;
+
+    // Guard against duplicate application submission
+    const existing = BazarnaStore.getApplicationForEvent(brandData, event.id);
+    if (existing) {
+      addToast(
+        "info",
+        "Already Subscribed",
+        `Your brand is already registered for this event (${existing.applicationCode}).`
+      );
+      router.push(`/dashboard/applications/${existing.id}`);
       return;
     }
 
@@ -478,16 +578,48 @@ export default function EventApplicationWizard() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-800">
-                National ID Number (رقم القومي)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-800">
+                  National ID Number (رقم القومي) <span className="text-bazarna-red">*</span>
+                </label>
+                <span
+                  className={`text-[11px] font-mono font-bold ${
+                    (brandData.nationalId || "").length === 14
+                      ? "text-emerald-600"
+                      : (brandData.nationalId || "").length > 0
+                      ? "text-amber-600"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  {(brandData.nationalId || "").length === 14
+                    ? "✓ 14 digits"
+                    : `${(brandData.nationalId || "").length}/14 digits`}
+                </span>
+              </div>
               <input
+                id="national-id-input"
                 type="text"
+                inputMode="numeric"
+                maxLength={14}
                 value={brandData.nationalId || ""}
-                onChange={(e) => setBrandData({ ...brandData, nationalId: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 14);
+                  setBrandData({ ...brandData, nationalId: val });
+                }}
                 placeholder="14-digit Egyptian National ID"
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm font-mono font-medium focus:outline-none focus:ring-2 focus:ring-bazarna-red/30"
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-mono font-medium transition focus:outline-none focus:ring-2 ${
+                  (brandData.nationalId || "").length === 14
+                    ? "border-emerald-400 focus:ring-emerald-300"
+                    : (brandData.nationalId || "").length > 0
+                    ? "border-amber-400 focus:ring-amber-300"
+                    : "border-zinc-200 focus:ring-bazarna-red/30"
+                }`}
               />
+              {(brandData.nationalId || "").length > 0 && (brandData.nationalId || "").length < 14 && (
+                <p className="text-[11px] text-amber-600 font-medium">
+                  National ID must be exactly 14 digits ({14 - (brandData.nationalId || "").length} remaining).
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -861,18 +993,17 @@ export default function EventApplicationWizard() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <a
-                    href={receiptFile.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-bold text-bazarna-red hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => setReceiptPreviewOpen(true)}
+                    className="text-xs font-bold text-bazarna-red hover:underline cursor-pointer"
                   >
                     View Receipt
-                  </a>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setReceiptFile(null)}
-                    className="text-xs font-bold text-rose-600 hover:underline"
+                    className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
                   >
                     Remove
                   </button>
@@ -1007,6 +1138,36 @@ export default function EventApplicationWizard() {
           </button>
         )}
       </div>
+
+      {/* In-page Receipt Preview Modal */}
+      {receiptPreviewOpen && receiptFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white max-w-2xl w-full rounded-3xl p-6 shadow-soft-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <h4 className="text-sm font-bold text-zinc-900 truncate max-w-[85%]">{receiptFile.name}</h4>
+              <button
+                type="button"
+                onClick={() => setReceiptPreviewOpen(false)}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-800"
+              >
+                Close (ESC)
+              </button>
+            </div>
+
+            <div className="max-h-[75vh] overflow-auto rounded-2xl bg-zinc-100 flex items-center justify-center p-3 min-h-[240px]">
+              {receiptFile.url.startsWith("data:application/pdf") ? (
+                <iframe src={receiptFile.url} className="w-full h-[65vh] rounded-xl" title={receiptFile.name} />
+              ) : (
+                <img
+                  src={receiptFile.url}
+                  alt={receiptFile.name}
+                  className="max-w-full h-auto rounded-xl object-contain shadow-soft-xs"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

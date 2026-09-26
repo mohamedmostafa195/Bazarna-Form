@@ -66,6 +66,20 @@ export default function BrandProfilePage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.nationalId) {
+      const cleanId = formData.nationalId.replace(/\D/g, "");
+      if (cleanId.length > 0 && cleanId.length !== 14) {
+        addToast(
+          "error",
+          "Invalid National ID",
+          "National ID Number (الرقم القومي) must be exactly 14 digits."
+        );
+        setActiveTab("legal");
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     try {
@@ -435,16 +449,47 @@ export default function BrandProfilePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-800">
-                National ID Number (رقم القومي)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-800">
+                  National ID Number (رقم القومي)
+                </label>
+                <span
+                  className={`text-[11px] font-mono font-bold ${
+                    (formData.nationalId || "").length === 14
+                      ? "text-emerald-600"
+                      : (formData.nationalId || "").length > 0
+                      ? "text-amber-600"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  {(formData.nationalId || "").length === 14
+                    ? "✓ 14 digits"
+                    : `${(formData.nationalId || "").length}/14 digits`}
+                </span>
+              </div>
               <input
                 type="text"
+                inputMode="numeric"
+                maxLength={14}
                 value={formData.nationalId || ""}
-                onChange={(e) => handleTextChange("nationalId", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 14);
+                  handleTextChange("nationalId", val);
+                }}
                 placeholder="14-digit Egyptian National ID"
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm font-mono font-medium focus:outline-none focus:ring-2 focus:ring-kiwi-400"
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-mono font-medium transition focus:outline-none focus:ring-2 ${
+                  (formData.nationalId || "").length === 14
+                    ? "border-emerald-400 focus:ring-emerald-300"
+                    : (formData.nationalId || "").length > 0
+                    ? "border-amber-400 focus:ring-amber-300"
+                    : "border-zinc-200 focus:ring-kiwi-400"
+                }`}
               />
+              {(formData.nationalId || "").length > 0 && (formData.nationalId || "").length < 14 && (
+                <p className="text-[11px] text-amber-600 font-medium">
+                  National ID must be exactly 14 digits ({14 - (formData.nationalId || "").length} remaining).
+                </p>
+              )}
             </div>
           </div>
         </div>

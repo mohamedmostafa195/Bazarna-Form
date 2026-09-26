@@ -75,25 +75,6 @@ function sanitizeForLocalStorage<T>(key: string, data: T): T {
       }) as unknown as T;
     }
 
-    if (key === STORAGE_KEYS.APPLICATIONS && Array.isArray(data)) {
-      return data.map((app: any) => {
-        if (
-          app.payment?.receiptFileUrl &&
-          typeof app.payment.receiptFileUrl === "string" &&
-          app.payment.receiptFileUrl.startsWith("data:") &&
-          app.payment.receiptFileUrl.length > 50000
-        ) {
-          return {
-            ...app,
-            payment: {
-              ...app.payment,
-              receiptFileUrl: "/images/receipt-placeholder.png",
-            },
-          };
-        }
-        return app;
-      }) as unknown as T;
-    }
 
     if (key === STORAGE_KEYS.BRANDS && Array.isArray(data)) {
       return data.map((brand: any) => {
@@ -557,6 +538,34 @@ export const BazarnaStore = {
     });
   },
 
+  getApplicationForEvent(brandIdOrBrand: string | BrandProfile, eventIdOrSlug: string): EventApplication | undefined {
+    const brand = typeof brandIdOrBrand === "string" ? this.getBrandById(brandIdOrBrand) : brandIdOrBrand;
+    const brandId = typeof brandIdOrBrand === "string" ? brandIdOrBrand : brandIdOrBrand?.id;
+    const event = this.getEventById(eventIdOrSlug) || this.getEventBySlug(eventIdOrSlug);
+    const eventId = event?.id || eventIdOrSlug;
+
+    return this.getApplications().find((a) => {
+      const matchesEvent =
+        a.eventId === eventId ||
+        a.event?.id === eventId ||
+        a.event?.slug === eventIdOrSlug ||
+        (event && a.eventId === event.id);
+
+      if (!matchesEvent) return false;
+      if (a.appStatus === "REJECTED") return false;
+
+      if (brandId && a.brandId === brandId) return true;
+      if (brand?.id && a.brandId === brand.id) return true;
+      if (brand?.brandName && a.brand?.brandName && a.brand.brandName.trim().toLowerCase() === brand.brandName.trim().toLowerCase()) return true;
+      if (brand?.contactEmail && a.brand?.contactEmail && a.brand.contactEmail.trim().toLowerCase() === brand.contactEmail.trim().toLowerCase()) return true;
+      return false;
+    });
+  },
+
+  hasAppliedForEvent(brandIdOrBrand: string | BrandProfile, eventIdOrSlug: string): boolean {
+    return !!this.getApplicationForEvent(brandIdOrBrand, eventIdOrSlug);
+  },
+
   submitApplication(data: {
     brand: BrandProfile;
     event: BazarnaEvent;
@@ -570,6 +579,11 @@ export const BazarnaStore = {
     tcAccepted: boolean;
     tcVersion: string;
   }): EventApplication {
+    const existing = this.getApplicationForEvent(data.brand, data.event.id);
+    if (existing) {
+      return existing;
+    }
+
     const applications = this.getApplications();
     const selectedPackage = data.event.packages.find((p) => p.id === data.packageId);
 
@@ -751,6 +765,50 @@ export const BazarnaStore = {
             adminNote,
           }),
         }).catch((err) => console.error("Error updating payment in MongoDB:", err));
+      }
+    }
+  },
+
+  uploadReceipt(appId: string, fileUrl: string, fileName: string): void {
+    const apps = this.getApplications();
+    const app = apps.find((a) => a.id === appId);
+    if (app) {
+      app.paymentStatus = "RECEIPT_UPLOADED";
+      if (!app.payment) {
+        app.payment = {
+          id: `pay-${Date.now()}`,
+          applicationId: app.id,
+          amount: app.package?.price || 0,
+          currency: "EGP",
+          method: "BANK_TRANSFER",
+          paymentStatus: "RECEIPT_UPLOADED",
+        };
+      }
+      app.payment.receiptFileUrl = fileUrl;
+      app.payment.receiptFileName = fileName;
+      app.payment.paymentStatus = "RECEIPT_UPLOADED";
+      app.payment.uploadedAt = new Date().toISOString();
+      app.updatedAt = new Date().toISOString();
+      setStored(STORAGE_KEYS.APPLICATIONS, apps);
+
+      this.addAuditLog(
+        app.brand?.contactName || "Brand User",
+        `Uploaded payment receipt ${fileName} for ${app.applicationCode}`,
+        "PAYMENT",
+        app.id
+      );
+
+      // Persist to MongoDB Atlas
+      if (typeof window !== "undefined") {
+        fetch(`/api/applications/${appId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentStatus: "RECEIPT_UPLOADED",
+            receiptFileUrl: fileUrl,
+            receiptFileName: fileName,
+          }),
+        }).catch((err) => console.error("Error updating receipt in MongoDB:", err));
       }
     }
   },

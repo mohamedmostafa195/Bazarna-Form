@@ -36,6 +36,7 @@ export default function ApplicationDetailPage() {
   const [application, setApplication] = useState<EventApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [previewModal, setPreviewModal] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -133,19 +134,33 @@ export default function ApplicationDetailPage() {
 
     try {
       const optimizedUrl = await readFileAsOptimizedDataUrl(file);
-      BazarnaStore.updatePaymentStatus(
-        application.id,
-        "RECEIPT_UPLOADED",
-        "Brand User",
-        `Uploaded receipt: ${file.name}`
+      BazarnaStore.uploadReceipt(application.id, optimizedUrl, file.name);
+      setApplication((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentStatus: "RECEIPT_UPLOADED",
+              payment: prev.payment
+                ? {
+                    ...prev.payment,
+                    receiptFileUrl: optimizedUrl,
+                    receiptFileName: file.name,
+                    paymentStatus: "RECEIPT_UPLOADED",
+                  }
+                : {
+                    id: `pay-${Date.now()}`,
+                    applicationId: prev.id,
+                    amount: prev.package?.price || 0,
+                    currency: "EGP",
+                    method: "BANK_TRANSFER",
+                    receiptFileUrl: optimizedUrl,
+                    receiptFileName: file.name,
+                    paymentStatus: "RECEIPT_UPLOADED",
+                  },
+            }
+          : null
       );
-      if (application.payment) {
-        application.payment.receiptFileUrl = optimizedUrl;
-        application.payment.receiptFileName = file.name;
-        application.payment.paymentStatus = "RECEIPT_UPLOADED";
-      }
-      setApplication({ ...application, paymentStatus: "RECEIPT_UPLOADED" });
-      addToast("success", "Receipt Uploaded", `${file.name} uploaded for review.`);
+      addToast("success", "Receipt Uploaded", `${file.name} uploaded successfully.`);
     } catch (err) {
       console.error("Receipt upload error:", err);
       addToast("error", "Upload Failed", "Could not process receipt file.");
@@ -298,18 +313,22 @@ export default function ApplicationDetailPage() {
             <span className="text-xs font-bold text-zinc-900 block">Payment Receipt:</span>
             {application.payment?.receiptFileUrl ? (
               <div className="p-3 rounded-2xl bg-kiwi-50 border border-kiwi-200 flex items-center justify-between text-xs">
-                <span className="font-semibold text-zinc-800 truncate max-w-[200px]">
+                <span className="font-semibold text-zinc-800 truncate max-w-[180px]" title={application.payment.receiptFileName || "payment_receipt.jpg"}>
                   {application.payment.receiptFileName || "payment_receipt.jpg"}
                 </span>
-                <a
-                  href={application.payment.receiptFileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPreviewModal({
+                      url: application.payment?.receiptFileUrl || "",
+                      title: `Payment Receipt — ${application.payment?.receiptFileName || "Receipt"}`,
+                    })
+                  }
+                  className="text-kiwi-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   View Receipt
-                </a>
+                </button>
               </div>
             ) : (
               <div className="p-4 border border-dashed border-amber-300 bg-amber-50/50 rounded-2xl text-center space-y-2">
@@ -374,6 +393,49 @@ export default function ApplicationDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Receipt Preview Modal */}
+      {previewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white max-w-2xl w-full rounded-3xl p-6 shadow-soft-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <h4 className="text-sm font-bold text-zinc-900 truncate max-w-[85%]">{previewModal.title}</h4>
+              <button
+                type="button"
+                onClick={() => setPreviewModal(null)}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-800"
+              >
+                Close (ESC)
+              </button>
+            </div>
+
+            <div className="max-h-[75vh] overflow-auto rounded-2xl bg-zinc-100 flex items-center justify-center p-3 min-h-[240px]">
+              {previewModal.url.startsWith("data:application/pdf") ? (
+                <iframe src={previewModal.url} className="w-full h-[65vh] rounded-xl" title={previewModal.title} />
+              ) : previewModal.url ? (
+                <img
+                  src={previewModal.url}
+                  alt={previewModal.title}
+                  className="max-w-full h-auto rounded-xl object-contain shadow-soft-xs"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                    const fb = document.getElementById("receipt-preview-fallback");
+                    if (fb) fb.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              <div id="receipt-preview-fallback" className={`${previewModal.url ? "hidden" : "flex"} flex-col items-center justify-center py-12 text-center space-y-2`}>
+                <FileText className="w-12 h-12 text-zinc-400" />
+                <p className="text-xs font-bold text-zinc-800">Receipt Attached</p>
+                <p className="text-[11px] text-zinc-500 font-mono">{application.payment?.receiptFileName || "Receipt"}</p>
+                <span className="text-[11px] font-semibold text-kiwi-700 bg-kiwi-50 px-2.5 py-1 rounded-full border border-kiwi-200">
+                  Status: {application.paymentStatus.replace("_", " ")}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

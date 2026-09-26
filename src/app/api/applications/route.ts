@@ -183,6 +183,28 @@ export async function POST(request: Request) {
     }
     const resolvedPackageId = pkg.id;
 
+    // Check if brand already has an active application for this event
+    const existingActiveApplication = await prisma.application.findFirst({
+      where: {
+        brandId: resolvedBrandId,
+        eventId: resolvedEventId,
+        appStatus: { not: "REJECTED" },
+      },
+      include: {
+        package: true,
+        payment: true,
+      },
+    });
+
+    if (existingActiveApplication) {
+      return NextResponse.json({
+        success: true,
+        alreadyApplied: true,
+        message: "You have already applied for this event.",
+        application: existingActiveApplication,
+      });
+    }
+
     // Generate unique application code
     const totalCount = await prisma.application.count();
     const seq = (totalCount + 101).toString().padStart(6, "0");
