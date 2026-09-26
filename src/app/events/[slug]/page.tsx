@@ -171,21 +171,42 @@ export default function EventDetailsPage() {
               <h2 className="text-xl font-bold text-zinc-950 font-display">About This Event</h2>
               <p className="text-sm text-zinc-700 leading-relaxed">{event.description}</p>
 
-              {event.highlights && event.highlights.length > 0 && (
-                <div className="pt-4 border-t border-zinc-100 space-y-3">
-                  <h4 className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
-                    Event Highlights
-                  </h4>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {event.highlights.map((h, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-zinc-700">
-                        <CheckCircle2 className="w-4 h-4 text-bazarna-red shrink-0 mt-0.5" />
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {(() => {
+                let highlightsList: string[] = [];
+                const rawHighlights = event.highlights as any;
+                if (Array.isArray(rawHighlights)) {
+                  highlightsList = rawHighlights.filter(Boolean);
+                } else if (typeof rawHighlights === "string" && rawHighlights.trim()) {
+                  try {
+                    const parsed = JSON.parse(rawHighlights);
+                    if (Array.isArray(parsed)) {
+                      highlightsList = parsed.filter(Boolean);
+                    } else if (typeof parsed === "string") {
+                      highlightsList = [parsed];
+                    }
+                  } catch (_) {
+                    highlightsList = rawHighlights.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
+                  }
+                }
+
+                if (highlightsList.length === 0) return null;
+
+                return (
+                  <div className="pt-4 border-t border-zinc-100 space-y-3">
+                    <h4 className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
+                      Event Highlights
+                    </h4>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {highlightsList.map((h, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-zinc-700">
+                          <CheckCircle2 className="w-4 h-4 text-bazarna-red shrink-0 mt-0.5" />
+                          <span>{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Packages Section */}

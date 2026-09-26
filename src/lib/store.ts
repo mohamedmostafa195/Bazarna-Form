@@ -245,12 +245,27 @@ export const BazarnaStore = {
         evtModified = true;
       }
 
+      // Ensure highlights is an array
+      const rawHighlights = evt.highlights as any;
+      let parsedHighlights = evt.highlights;
+      if (typeof rawHighlights === "string") {
+        try {
+          const parsed = JSON.parse(rawHighlights);
+          if (Array.isArray(parsed)) parsedHighlights = parsed;
+          else parsedHighlights = rawHighlights.trim() ? [rawHighlights] : [];
+        } catch (_) {
+          parsedHighlights = rawHighlights.trim() ? [rawHighlights] : [];
+        }
+        evtModified = true;
+      }
+
       if (evtModified) {
         modified = true;
         return {
           ...evt,
           slug: newSlug,
           questions: filteredQuestions,
+          highlights: parsedHighlights,
         };
       }
 

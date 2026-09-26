@@ -100,7 +100,7 @@ export interface BazarnaEvent {
   name: string;
   slug: string;
   description: string;
-  highlights?: string[];
+  highlights?: string[] | string;
   coverImage: string;
   location: string;
   googleMapsUrl?: string;
