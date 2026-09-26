@@ -51,6 +51,8 @@ export default function AdminApplicationReviewPage() {
   // Document preview modal
   const [previewModal, setPreviewModal] = useState<{ url: string; title: string } | null>(null);
 
+  const canApprove = Boolean(application?.assignedBooth?.trim() || boothInput.trim());
+
   useEffect(() => {
     if (!id) return;
 
@@ -149,12 +151,42 @@ export default function AdminApplicationReviewPage() {
   };
 
   const handleAppStatus = (status: ApplicationStatus, reason?: string) => {
+    if (!application) return;
+
+    if (status === "APPROVED") {
+      const finalBooth = boothInput.trim() || application.assignedBooth?.trim();
+      if (!finalBooth) {
+        addToast(
+          "error",
+          "Booth Location Required",
+          "Please enter and assign a booth location before approving this brand."
+        );
+        const el = document.getElementById("booth-number-input");
+        el?.focus();
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      // Auto-assign booth if entered in input but not yet saved
+      if (application.assignedBooth !== finalBooth) {
+        BazarnaStore.assignBooth(application.id, finalBooth, "Ahmed Operations");
+      }
+    }
+
     BazarnaStore.updateApplicationStatus(application.id, status, "Ahmed Operations", reason);
-    setApplication({
-      ...application,
-      appStatus: status,
-      adminFeedback: reason !== undefined ? reason : application.adminFeedback,
-    });
+    setApplication((prev) =>
+      prev
+        ? {
+            ...prev,
+            appStatus: status,
+            assignedBooth:
+              status === "APPROVED"
+                ? (boothInput.trim() || prev.assignedBooth)
+                : prev.assignedBooth,
+            adminFeedback: reason !== undefined ? reason : prev.adminFeedback,
+          }
+        : null
+    );
     addToast("success", "Application Status Updated", `Status changed to ${status.replace("_", " ")}`);
     if (showChangeModal) setShowChangeModal(false);
   };
@@ -172,9 +204,13 @@ export default function AdminApplicationReviewPage() {
   };
 
   const handleAssignBooth = () => {
-    if (!boothInput.trim()) return;
+    if (!application) return;
+    if (!boothInput.trim()) {
+      addToast("error", "Booth Number Required", "Please enter a booth number or code.");
+      return;
+    }
     BazarnaStore.assignBooth(application.id, boothInput.trim(), "Tamer Logistics");
-    setApplication({ ...application, assignedBooth: boothInput.trim() });
+    setApplication((prev) => (prev ? { ...prev, assignedBooth: boothInput.trim() } : null));
     addToast("success", "Booth Assigned", `Assigned ${boothInput.trim()} to ${application.brand.brandName}`);
   };
 
@@ -230,13 +266,39 @@ export default function AdminApplicationReviewPage() {
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => handleAppStatus("APPROVED")}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-kiwi-500 hover:bg-kiwi-600 text-white font-bold text-xs shadow-kiwi-glow transition"
-              >
-                <Check className="w-4 h-4" />
-                Approve Brand
-              </button>
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canApprove) {
+                      addToast(
+                        "error",
+                        "Booth Location Required",
+                        "Please fill in and assign a booth location before approving."
+                      );
+                      const el = document.getElementById("booth-number-input");
+                      el?.focus();
+                      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      return;
+                    }
+                    handleAppStatus("APPROVED");
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs transition ${
+                    canApprove
+                      ? "bg-kiwi-500 hover:bg-kiwi-600 text-white shadow-kiwi-glow cursor-pointer"
+                      : "bg-zinc-200 hover:bg-zinc-200 text-zinc-400 border border-zinc-200 shadow-none cursor-not-allowed opacity-70"
+                  }`}
+                  title={!canApprove ? "Assign booth location before approving" : "Approve Brand"}
+                >
+                  <Check className="w-4 h-4" />
+                  Approve Brand
+                </button>
+                {!canApprove && (
+                  <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[220px] px-2.5 py-1.5 bg-zinc-900 text-white text-[11px] rounded-lg shadow-lg text-center z-20 pointer-events-none">
+                    Assign booth location first to approve
+                  </span>
+                )}
+              </div>
 
               <button
                 onClick={() => handleAppStatus("UNDER_REVIEW")}
@@ -598,22 +660,50 @@ export default function AdminApplicationReviewPage() {
           </div>
 
           {/* Booth Assignment Card */}
-          <div className="bg-white p-6 rounded-3xl border border-zinc-200/90 shadow-soft-sm space-y-4">
-            <h3 className="text-base font-bold text-zinc-950 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-kiwi-600" />
-              Assign Booth Location
-            </h3>
+          <div
+            id="booth-card"
+            className={`bg-white p-6 rounded-3xl border transition shadow-soft-sm space-y-4 ${
+              !canApprove ? "border-amber-300 ring-2 ring-amber-100/70" : "border-zinc-200/90"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-zinc-950 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-kiwi-600" />
+                Assign Booth Location
+              </h3>
+              {application.assignedBooth ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-kiwi-100 text-kiwi-800 border border-kiwi-200">
+                  <Check className="w-3 h-3 text-kiwi-700" />
+                  Assigned: {application.assignedBooth}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                  Required for Approval
+                </span>
+              )}
+            </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-700">
-                Booth Number / Code
+              <label className="text-xs font-semibold text-zinc-700 flex justify-between">
+                <span>Booth Number / Code</span>
+                {!application.assignedBooth && !boothInput.trim() && (
+                  <span className="text-amber-600 text-[11px] font-semibold">
+                    * Required before approval
+                  </span>
+                )}
               </label>
               <input
+                id="booth-number-input"
                 type="text"
                 value={boothInput}
                 onChange={(e) => setBoothInput(e.target.value)}
                 placeholder="e.g. Booth A-04"
-                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 text-xs font-bold uppercase focus:ring-2 focus:ring-kiwi-400"
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-bold uppercase transition focus:ring-2 focus:ring-kiwi-400 ${
+                  !application.assignedBooth && !boothInput.trim()
+                    ? "border-amber-300 bg-amber-50/20"
+                    : "border-zinc-200"
+                }`}
               />
               <button
                 type="button"
