@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Flame,
   ChevronLeft,
+  Lock,
 } from "lucide-react";
 
 export default function EventDetailsPage() {
@@ -45,6 +46,74 @@ export default function EventDetailsPage() {
       setLoading(false);
     }
   }, [slug]);
+
+  const isRegistrationOpen = event?.status === "REGISTRATION_OPEN";
+
+  const getHeaderStatusBadge = (status: string) => {
+    switch (status) {
+      case "REGISTRATION_OPEN":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-bazarna-red text-white shadow-bazarna-glow">
+            <Flame className="w-3.5 h-3.5" />
+            REGISTRATION OPEN
+          </span>
+        );
+      case "UPCOMING":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-500 text-white shadow-soft-sm">
+            <Calendar className="w-3.5 h-3.5" />
+            UPCOMING / OPENS SOON
+          </span>
+        );
+      case "REGISTRATION_CLOSED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-600 text-white shadow-soft-sm">
+            <Lock className="w-3.5 h-3.5" />
+            REGISTRATION CLOSED
+          </span>
+        );
+      case "COMPLETED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-700 text-white shadow-soft-sm">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            EVENT COMPLETED
+          </span>
+        );
+      case "DRAFT":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-600 text-white shadow-soft-sm">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            DRAFT PREVIEW
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-700 text-white shadow-soft-sm">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            EVENT CANCELLED
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getClosedPackageButtonLabel = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
+        return "Event Concluded";
+      case "REGISTRATION_CLOSED":
+        return "Registration Closed";
+      case "UPCOMING":
+        return "Opening Soon";
+      case "DRAFT":
+        return "Draft - Not Available";
+      case "CANCELLED":
+        return "Event Cancelled";
+      default:
+        return "Booking Closed";
+    }
+  };
 
   if (loading) {
     return (
@@ -106,12 +175,7 @@ export default function EventDetailsPage() {
 
         <div className="absolute bottom-8 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white space-y-3">
           <div className="flex flex-wrap items-center gap-2.5">
-            {event.status === "REGISTRATION_OPEN" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-bazarna-red text-white shadow-bazarna-glow">
-                <Flame className="w-3.5 h-3.5" />
-                REGISTRATION OPEN
-              </span>
-            )}
+            {getHeaderStatusBadge(event.status)}
             <span className="text-xs font-medium text-zinc-300">
               Capacity: {event.capacity} Brands
             </span>
@@ -223,6 +287,26 @@ export default function EventDetailsPage() {
                 <span className="text-xs text-zinc-500 font-medium">All prices include VAT</span>
               </div>
 
+              {!isRegistrationOpen && !existingApplication && (
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-950 flex items-start gap-3 shadow-soft-xs">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold text-amber-900 text-sm">
+                      {event.status === "COMPLETED" && "This event has already concluded (Closed)."}
+                      {event.status === "REGISTRATION_CLOSED" && "Registration for this event is now closed."}
+                      {event.status === "UPCOMING" && "Registration is not open yet (Upcoming)."}
+                      {event.status === "DRAFT" && "This event is currently in draft preview."}
+                      {event.status === "CANCELLED" && "This event has been cancelled."}
+                    </p>
+                    <p className="text-amber-700/90 font-medium leading-relaxed">
+                      {event.status === "UPCOMING"
+                        ? "Packages are shown for preview only. Booking will become available once registration officially opens."
+                        : "Packages are shown for informational reference only. Booking and space selection are not currently available for this event."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {event.packages.map((pkg) => {
                   const isSoldOut = pkg.remainingQty <= 0;
@@ -240,10 +324,12 @@ export default function EventDetailsPage() {
                       className={`flex flex-col justify-between rounded-3xl border p-6 bg-white transition ${
                         isThisPackageSubscribed
                           ? "border-kiwi-400 bg-kiwi-50/20 ring-2 ring-kiwi-200 shadow-soft-md"
-                          : isSoldOut
-                          ? "border-zinc-200 opacity-60"
                           : existingApplication
                           ? "border-zinc-200 opacity-75 bg-zinc-50/40"
+                          : !isRegistrationOpen
+                          ? "border-zinc-200/80 bg-zinc-50/50 opacity-80"
+                          : isSoldOut
+                          ? "border-zinc-200 opacity-60"
                           : "border-zinc-200/90 shadow-soft-md hover:shadow-soft-xl hover:border-red-300"
                       }`}
                     >
@@ -265,6 +351,11 @@ export default function EventDetailsPage() {
                                 <span className="px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-xs tracking-wider">
                                   SOLD OUT
                                 </span>
+                              </div>
+                            ) : !isRegistrationOpen ? (
+                              <div className="absolute top-3 right-3 bg-zinc-900/80 backdrop-blur-md text-zinc-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <Lock className="w-3 h-3 text-zinc-300" />
+                                {getClosedPackageButtonLabel(event.status)}
                               </div>
                             ) : (
                               <div className="absolute top-3 right-3 bg-zinc-900/80 backdrop-blur-md text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full">
@@ -320,6 +411,14 @@ export default function EventDetailsPage() {
                             title="You already have an active booking for this event with another package"
                           >
                             Not Selected
+                          </button>
+                        ) : !isRegistrationOpen ? (
+                          <button
+                            disabled
+                            className="w-full py-3 px-4 rounded-xl bg-zinc-100 text-zinc-400 border border-zinc-200 text-xs font-bold cursor-not-allowed flex items-center justify-center gap-1.5"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                            {getClosedPackageButtonLabel(event.status)}
                           </button>
                         ) : isSoldOut ? (
                           <button
@@ -450,8 +549,22 @@ export default function EventDetailsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="text-center p-4 bg-zinc-50 rounded-2xl text-xs font-semibold text-zinc-500">
-                  Registration for this event is currently {event.status.toLowerCase().replace("_", " ")}.
+                <div className="p-4 bg-zinc-50 border border-zinc-200/80 rounded-2xl text-xs font-semibold text-zinc-600 text-center space-y-1.5">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-zinc-800">
+                    <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>
+                      {event.status === "COMPLETED" && "Event Concluded"}
+                      {event.status === "REGISTRATION_CLOSED" && "Registration Closed"}
+                      {event.status === "UPCOMING" && "Registration Opening Soon"}
+                      {event.status === "DRAFT" && "Draft Mode (Unpublished)"}
+                      {event.status === "CANCELLED" && "Event Cancelled"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 font-normal">
+                    {event.status === "UPCOMING"
+                      ? "Booking will open once the organizer opens the registration window."
+                      : "New applications cannot be accepted for this event."}
+                  </p>
                 </div>
               )}
             </div>

@@ -29,6 +29,7 @@ import {
   Info,
   Clock,
   Package,
+  Lock,
 } from "lucide-react";
 
 const STEPS = [
@@ -206,6 +207,94 @@ export default function EventApplicationWizard() {
             className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-transparent text-zinc-600 hover:text-zinc-950 font-bold text-xs transition"
           >
             Browse Other Events
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (event.status !== "REGISTRATION_OPEN") {
+    const statusDetails: Record<string, { title: string; desc: string; badge: string }> = {
+      COMPLETED: {
+        title: "This Event Has Ended",
+        desc: "The event has concluded and registrations are officially closed.",
+        badge: "Event Concluded",
+      },
+      REGISTRATION_CLOSED: {
+        title: "Registration Is Closed",
+        desc: "Applications for this event are no longer accepted as the registration window has ended.",
+        badge: "Registration Closed",
+      },
+      UPCOMING: {
+        title: "Registration Opening Soon",
+        desc: "This event is currently upcoming. Registration has not opened yet.",
+        badge: "Opening Soon",
+      },
+      DRAFT: {
+        title: "Draft Event",
+        desc: "This event is currently unpublished and not open for booking.",
+        badge: "Draft",
+      },
+      CANCELLED: {
+        title: "Event Cancelled",
+        desc: "This event has been cancelled and cannot accept registrations.",
+        badge: "Cancelled",
+      },
+    };
+
+    const info = statusDetails[event.status] || {
+      title: "Registration Not Open",
+      desc: "This event is currently not accepting registrations.",
+      badge: event.status.replace("_", " "),
+    };
+
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6 animate-in fade-in">
+        <div className="w-16 h-16 rounded-3xl bg-zinc-100 text-zinc-600 flex items-center justify-center mx-auto shadow-soft-sm border border-zinc-200">
+          <Lock className="w-8 h-8 text-zinc-600" />
+        </div>
+
+        <div className="space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-800 border border-zinc-200 uppercase">
+            {info.badge}
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 font-display">
+            {info.title}
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-600 max-w-md mx-auto">
+            {info.desc}
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-zinc-200/90 shadow-soft-sm text-left space-y-3 text-xs max-w-md mx-auto">
+          <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+            <span className="text-zinc-500 font-semibold">Event:</span>
+            <span className="font-bold text-zinc-950">{event.name}</span>
+          </div>
+          <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+            <span className="text-zinc-500 font-semibold">Status:</span>
+            <span className="font-bold text-xs px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-800 uppercase">
+              {event.status.replace("_", " ")}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-zinc-500 font-semibold">Date:</span>
+            <span className="font-medium text-zinc-800">{event.startDate}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+          <Link
+            href={`/events/${event.slug}`}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-bold text-xs shadow-soft-sm transition"
+          >
+            View Event Details
+          </Link>
+          <Link
+            href="/events"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-soft-sm transition"
+          >
+            Explore Active Events
           </Link>
         </div>
       </div>

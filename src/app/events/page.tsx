@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 export default function EventsPage() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, currentBrand } = useAuth();
   const [events, setEvents] = useState<BazarnaEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -161,6 +161,11 @@ export default function EventsPage() {
                 ? Math.min(...event.packages.map((p) => p.price)).toLocaleString()
                 : null;
 
+            const existingApp =
+              currentBrand && isLoggedIn
+                ? BazarnaStore.getApplicationForEvent(currentBrand, event.id)
+                : null;
+
             return (
               <div
                 key={event.id}
@@ -233,7 +238,16 @@ export default function EventsPage() {
                         View Event
                       </Link>
 
-                      {event.status === "REGISTRATION_OPEN" ? (
+                      {existingApp ? (
+                        <Link
+                          href={`/dashboard/applications/${existingApp.id}`}
+                          className="w-full inline-flex items-center justify-center gap-1 py-2 px-2.5 rounded-lg bg-kiwi-100 hover:bg-kiwi-200 text-kiwi-800 border border-kiwi-300 text-[11px] font-bold shadow-soft-xs transition"
+                          title="View your existing application"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-kiwi-600" />
+                          Subscribed
+                        </Link>
+                      ) : event.status === "REGISTRATION_OPEN" ? (
                         <Link
                           href={
                             isLoggedIn
@@ -250,7 +264,11 @@ export default function EventsPage() {
                           disabled
                           className="w-full py-2 px-2.5 rounded-lg bg-zinc-100 text-zinc-400 text-[11px] font-semibold cursor-not-allowed"
                         >
-                          {event.status === "UPCOMING" ? "Opening Soon" : "Closed"}
+                          {event.status === "UPCOMING"
+                            ? "Opening Soon"
+                            : event.status === "COMPLETED"
+                            ? "Completed"
+                            : "Closed"}
                         </button>
                       )}
                     </div>
