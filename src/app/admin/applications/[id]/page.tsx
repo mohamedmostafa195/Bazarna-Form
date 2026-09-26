@@ -29,9 +29,7 @@ import {
   Check,
   X,
   Send,
-  Upload,
 } from "lucide-react";
-import { readFileAsOptimizedDataUrl } from "@/lib/image-util";
 
 export default function AdminApplicationReviewPage() {
   const params = useParams();
@@ -51,7 +49,22 @@ export default function AdminApplicationReviewPage() {
   // Document preview modal
   const [previewModal, setPreviewModal] = useState<{ url: string; title: string } | null>(null);
 
-  const canApprove = Boolean(application?.assignedBooth?.trim() || boothInput.trim());
+  const isPaymentPaid = application?.paymentStatus === "PAID";
+  const isBoothAssigned = Boolean(application?.assignedBooth?.trim() || boothInput.trim());
+  const canApprove = isPaymentPaid && isBoothAssigned;
+
+  const getApprovalMissingText = () => {
+    if (!isPaymentPaid && !isBoothAssigned) {
+      return "Verify payment & assign booth first to approve";
+    }
+    if (!isPaymentPaid) {
+      return "Verify payment as Paid first to approve";
+    }
+    if (!isBoothAssigned) {
+      return "Assign booth location first to approve";
+    }
+    return "Approve Brand";
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -103,57 +116,21 @@ export default function AdminApplicationReviewPage() {
     );
   }
 
-  const handleQuickDocUpload = async (
-    docType: "TAX_ID_CARD" | "NATIONAL_ID",
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file || !application) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      addToast("error", "File Too Large", "Maximum supported file size is 15MB.");
-      return;
-    }
-
-    try {
-      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
-      const newDoc: BrandDocument = {
-        id: `doc-${Date.now()}`,
-        brandId: application.brandId,
-        documentType: docType,
-        fileName: file.name,
-        fileUrl: optimizedUrl,
-        fileSize: file.size,
-        status: "UPLOADED",
-        uploadedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const brandProfile =
-        BazarnaStore.getBrandById(application.brandId) ||
-        BazarnaStore.getBrands().find(
-          (b) =>
-            (b.brandName && application.brand?.brandName && b.brandName.toLowerCase() === application.brand.brandName.toLowerCase()) ||
-            (b.contactEmail && application.brand?.contactEmail && b.contactEmail.toLowerCase() === application.brand.contactEmail.toLowerCase())
-        ) ||
-        application.brand;
-
-      const existingDocs = brandProfile.documents || [];
-      const updatedDocs = [...existingDocs.filter((d) => d.documentType !== docType), newDoc];
-      const updatedBrand = { ...brandProfile, documents: updatedDocs };
-
-      BazarnaStore.saveBrand(updatedBrand);
-      addToast("success", "Document Saved", `${file.name} saved successfully.`);
-    } catch (err) {
-      console.error("Upload error:", err);
-      addToast("error", "Upload Failed", "Could not process document file.");
-    }
-  };
-
   const handleAppStatus = (status: ApplicationStatus, reason?: string) => {
     if (!application) return;
 
     if (status === "APPROVED") {
+      if (application.paymentStatus !== "PAID") {
+        addToast(
+          "error",
+          "Payment Verification Required",
+          "Please verify payment and mark it as Paid before approving this application."
+        );
+        const el = document.getElementById("payment-card");
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
       const finalBooth = boothInput.trim() || application.assignedBooth?.trim();
       if (!finalBooth) {
         addToast(
@@ -271,15 +248,27 @@ export default function AdminApplicationReviewPage() {
                   type="button"
                   onClick={() => {
                     if (!canApprove) {
-                      addToast(
-                        "error",
-                        "Booth Location Required",
-                        "Please fill in and assign a booth location before approving."
-                      );
-                      const el = document.getElementById("booth-number-input");
-                      el?.focus();
-                      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      return;
+                      if (!isPaymentPaid) {
+                        addToast(
+                          "error",
+                          "Payment Verification Required",
+                          "Please verify the payment receipt and mark payment as Paid before approving."
+                        );
+                        const el = document.getElementById("payment-card");
+                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        return;
+                      }
+                      if (!isBoothAssigned) {
+                        addToast(
+                          "error",
+                          "Booth Location Required",
+                          "Please fill in and assign a booth location before approving."
+                        );
+                        const el = document.getElementById("booth-number-input");
+                        el?.focus();
+                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        return;
+                      }
                     }
                     handleAppStatus("APPROVED");
                   }}
@@ -288,14 +277,14 @@ export default function AdminApplicationReviewPage() {
                       ? "bg-kiwi-500 hover:bg-kiwi-600 text-white shadow-kiwi-glow cursor-pointer"
                       : "bg-zinc-200 hover:bg-zinc-200 text-zinc-400 border border-zinc-200 shadow-none cursor-not-allowed opacity-70"
                   }`}
-                  title={!canApprove ? "Assign booth location before approving" : "Approve Brand"}
+                  title={!canApprove ? getApprovalMissingText() : "Approve Brand"}
                 >
                   <Check className="w-4 h-4" />
                   Approve Brand
                 </button>
                 {!canApprove && (
-                  <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[220px] px-2.5 py-1.5 bg-zinc-900 text-white text-[11px] rounded-lg shadow-lg text-center z-20 pointer-events-none">
-                    Assign booth location first to approve
+                  <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[280px] px-2.5 py-1.5 bg-zinc-900 text-white text-[11px] rounded-lg shadow-lg text-center z-20 pointer-events-none">
+                    {getApprovalMissingText()}
                   </span>
                 )}
               </div>
@@ -456,69 +445,73 @@ export default function AdminApplicationReviewPage() {
                     </div>
                   </div>
 
-                  {/* Document Previews */}
+                  {/* Document Previews (Side-by-side small cards) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
-                    {/* Tax ID Doc */}
-                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                    {/* Tax ID Doc Card */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/90 space-y-2.5 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-zinc-900 block">Tax ID Card Scan</span>
-                        <label className="cursor-pointer text-[10px] font-bold text-zinc-600 hover:text-zinc-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-zinc-200 hover:border-zinc-300 transition">
-                          <Upload className="w-2.5 h-2.5 text-zinc-500" />
-                          {taxDoc ? "Change" : "Upload"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,application/pdf"
-                            onChange={(e) => handleQuickDocUpload("TAX_ID_CARD", e)}
-                            className="hidden"
-                          />
-                        </label>
+                        {taxDoc && (
+                          <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[140px]" title={taxDoc.fileName}>
+                            {taxDoc.fileName}
+                          </span>
+                        )}
                       </div>
-                      {taxDoc ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-zinc-600 truncate max-w-[140px]">{taxDoc.fileName}</span>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewModal({ url: taxDoc.fileUrl, title: "Tax ID Card" })}
-                            className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Preview
-                          </button>
+
+                      {taxDoc?.fileUrl ? (
+                        <div
+                          onClick={() => setPreviewModal({ url: taxDoc.fileUrl, title: "Tax ID Card Scan" })}
+                          className="h-36 sm:h-40 w-full rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 relative group cursor-pointer shadow-soft-xs"
+                          title="Click to Enlarge"
+                        >
+                          <img
+                            src={taxDoc.fileUrl}
+                            alt="Tax ID Card Scan"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-zinc-950/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white font-bold text-xs transition backdrop-blur-[1px]">
+                            <Eye className="w-4 h-4" />
+                            <span>Click to Enlarge</span>
+                          </div>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 italic">No document uploaded</span>
+                        <div className="h-36 sm:h-40 w-full rounded-xl border border-dashed border-zinc-300 bg-white/50 flex items-center justify-center text-zinc-400 italic text-xs">
+                          No document uploaded
+                        </div>
                       )}
                     </div>
 
-                    {/* National ID Doc */}
-                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                    {/* National ID Doc Card */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/90 space-y-2.5 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-zinc-900 block">National ID Scan</span>
-                        <label className="cursor-pointer text-[10px] font-bold text-zinc-600 hover:text-zinc-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-zinc-200 hover:border-zinc-300 transition">
-                          <Upload className="w-2.5 h-2.5 text-zinc-500" />
-                          {nationalDoc ? "Change" : "Upload"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,application/pdf"
-                            onChange={(e) => handleQuickDocUpload("NATIONAL_ID", e)}
-                            className="hidden"
-                          />
-                        </label>
+                        {nationalDoc && (
+                          <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[140px]" title={nationalDoc.fileName}>
+                            {nationalDoc.fileName}
+                          </span>
+                        )}
                       </div>
-                      {nationalDoc ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-zinc-600 truncate max-w-[140px]">{nationalDoc.fileName}</span>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewModal({ url: nationalDoc.fileUrl, title: "National ID" })}
-                            className="text-kiwi-700 font-bold hover:underline flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Preview
-                          </button>
+
+                      {nationalDoc?.fileUrl ? (
+                        <div
+                          onClick={() => setPreviewModal({ url: nationalDoc.fileUrl, title: "National ID Scan" })}
+                          className="h-36 sm:h-40 w-full rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 relative group cursor-pointer shadow-soft-xs"
+                          title="Click to Enlarge"
+                        >
+                          <img
+                            src={nationalDoc.fileUrl}
+                            alt="National ID Scan"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-zinc-950/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white font-bold text-xs transition backdrop-blur-[1px]">
+                            <Eye className="w-4 h-4" />
+                            <span>Click to Enlarge</span>
+                          </div>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 italic">No document uploaded</span>
+                        <div className="h-36 sm:h-40 w-full rounded-xl border border-dashed border-zinc-300 bg-white/50 flex items-center justify-center text-zinc-400 italic text-xs">
+                          No document uploaded
+                        </div>
                       )}
                     </div>
                   </div>
@@ -586,26 +579,52 @@ export default function AdminApplicationReviewPage() {
         {/* Right Column: Package, Payment & Booth Assignment */}
         <div className="lg:col-span-4 space-y-6">
           {/* Package & Payment Actions */}
-          <div className="bg-white p-6 rounded-3xl border border-zinc-200/90 shadow-soft-sm space-y-4">
-            <h3 className="text-base font-bold text-zinc-950 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-babyblue-600" />
-              Payment & Finance
-            </h3>
+          <div
+            id="payment-card"
+            className={`bg-white p-6 rounded-3xl border transition shadow-soft-sm space-y-4 ${
+              !isPaymentPaid ? "border-amber-300 ring-2 ring-amber-100/70" : "border-zinc-200/90"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-zinc-950 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-babyblue-600" />
+                Payment & Finance
+              </h3>
+              {isPaymentPaid ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-kiwi-100 text-kiwi-800 border border-kiwi-200">
+                  <Check className="w-3 h-3 text-kiwi-700" /> Paid & Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  <AlertCircle className="w-3 h-3 text-amber-600" /> Required for Approval
+                </span>
+              )}
+            </div>
 
             <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-100 space-y-2 text-xs">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Package:</span>
                 <strong className="text-zinc-900">{application.package?.name}</strong>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Total Amount:</span>
                 <strong className="text-sm font-black text-zinc-950">
                   {application.package?.price.toLocaleString()} EGP
                 </strong>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Payment Status:</span>
-                <span className="font-bold text-zinc-900">
+                <span
+                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    application.paymentStatus === "PAID"
+                      ? "bg-kiwi-100 text-kiwi-800 border border-kiwi-200"
+                      : application.paymentStatus === "RECEIPT_UPLOADED"
+                      ? "bg-babyblue-100 text-babyblue-800 border border-babyblue-200"
+                      : application.paymentStatus === "REJECTED"
+                      ? "bg-rose-100 text-rose-800 border border-rose-200"
+                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                  }`}
+                >
                   {application.paymentStatus.replace("_", " ")}
                 </span>
               </div>
@@ -636,24 +655,55 @@ export default function AdminApplicationReviewPage() {
                     </button>
                   </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePaymentStatus("PAID")}
-                      className="flex-1 py-2 rounded-xl bg-kiwi-500 hover:bg-kiwi-600 text-white font-bold text-xs shadow-kiwi-glow transition"
-                    >
-                      Verify & Mark Paid
-                    </button>
-                    <button
-                      onClick={() => handlePaymentStatus("REJECTED")}
-                      className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-rose-50 text-rose-700 font-bold text-xs transition"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {application.paymentStatus === "PAID" ? (
+                    <div className="p-2.5 rounded-xl bg-kiwi-50 border border-kiwi-200 text-kiwi-900 text-xs font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-kiwi-600" />
+                        Receipt Verified & Marked Paid
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentStatus("RECEIPT_UPLOADED")}
+                        className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentStatus("PAID")}
+                        className="flex-1 py-2 rounded-xl bg-kiwi-500 hover:bg-kiwi-600 text-white font-bold text-xs shadow-kiwi-glow transition"
+                      >
+                        Verify & Mark Paid
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentStatus("REJECTED")}
+                        className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-rose-50 text-rose-700 font-bold text-xs transition"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="p-4 border border-dashed border-zinc-300 rounded-2xl text-center text-xs text-zinc-400">
-                  No payment receipt uploaded yet.
+                <div className="p-4 border border-dashed border-zinc-300 rounded-2xl text-center text-xs text-zinc-500 space-y-2">
+                  <p>No payment receipt uploaded yet.</p>
+                  {application.paymentStatus === "PAID" ? (
+                    <div className="text-kiwi-700 font-bold flex items-center justify-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Marked Paid Manually
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handlePaymentStatus("PAID")}
+                      className="px-3 py-1.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs transition"
+                    >
+                      Mark Paid Manually
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -663,7 +713,7 @@ export default function AdminApplicationReviewPage() {
           <div
             id="booth-card"
             className={`bg-white p-6 rounded-3xl border transition shadow-soft-sm space-y-4 ${
-              !canApprove ? "border-amber-300 ring-2 ring-amber-100/70" : "border-zinc-200/90"
+              !isBoothAssigned ? "border-amber-300 ring-2 ring-amber-100/70" : "border-zinc-200/90"
             }`}
           >
             <div className="flex items-center justify-between">
