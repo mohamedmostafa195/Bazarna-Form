@@ -226,12 +226,24 @@ export default function EventDetailsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {event.packages.map((pkg) => {
                   const isSoldOut = pkg.remainingQty <= 0;
+                  const isThisPackageSubscribed =
+                    !!existingApplication &&
+                    (existingApplication.packageId === pkg.id ||
+                      existingApplication.package?.id === pkg.id ||
+                      (existingApplication.package?.name &&
+                        pkg.name &&
+                        existingApplication.package.name.toLowerCase() === pkg.name.toLowerCase()));
+
                   return (
                     <div
                       key={pkg.id}
                       className={`flex flex-col justify-between rounded-3xl border p-6 bg-white transition ${
-                        isSoldOut
+                        isThisPackageSubscribed
+                          ? "border-kiwi-400 bg-kiwi-50/20 ring-2 ring-kiwi-200 shadow-soft-md"
+                          : isSoldOut
                           ? "border-zinc-200 opacity-60"
+                          : existingApplication
+                          ? "border-zinc-200 opacity-75 bg-zinc-50/40"
                           : "border-zinc-200/90 shadow-soft-md hover:shadow-soft-xl hover:border-red-300"
                       }`}
                     >
@@ -243,7 +255,12 @@ export default function EventDetailsPage() {
                               alt={pkg.name}
                               className="w-full h-full object-cover"
                             />
-                            {isSoldOut ? (
+                            {isThisPackageSubscribed ? (
+                              <div className="absolute top-3 right-3 bg-kiwi-700 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-soft-xs flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Your Package
+                              </div>
+                            ) : isSoldOut ? (
                               <div className="absolute inset-0 bg-zinc-950/70 flex items-center justify-center">
                                 <span className="px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-xs tracking-wider">
                                   SOLD OUT
@@ -258,7 +275,14 @@ export default function EventDetailsPage() {
                         )}
 
                         <div>
-                          <h3 className="text-lg font-bold text-zinc-950">{pkg.name}</h3>
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-lg font-bold text-zinc-950">{pkg.name}</h3>
+                            {isThisPackageSubscribed && (
+                              <span className="text-[10px] font-bold text-kiwi-800 bg-kiwi-100 border border-kiwi-300 px-2 py-0.5 rounded-full">
+                                Booked ✓
+                              </span>
+                            )}
+                          </div>
                           <div className="mt-1 flex items-baseline gap-1">
                             <span className="text-2xl font-black text-zinc-950">
                               {pkg.price.toLocaleString()}
@@ -281,14 +305,22 @@ export default function EventDetailsPage() {
                       </div>
 
                       <div className="pt-6">
-                        {existingApplication ? (
+                        {isThisPackageSubscribed ? (
                           <Link
                             href={`/dashboard/applications/${existingApplication.id}`}
-                            className="w-full inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl bg-kiwi-50 hover:bg-kiwi-100 text-kiwi-800 border border-kiwi-200 text-xs font-bold transition shadow-soft-xs"
+                            className="w-full inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl bg-kiwi-50 hover:bg-kiwi-100 text-kiwi-800 border border-kiwi-300 text-xs font-bold transition shadow-soft-xs"
                           >
                             <CheckCircle2 className="w-4 h-4 text-kiwi-600" />
                             Already Subscribed
                           </Link>
+                        ) : existingApplication ? (
+                          <button
+                            disabled
+                            className="w-full py-3 px-4 rounded-xl bg-zinc-100 text-zinc-400 border border-zinc-200 text-xs font-semibold cursor-not-allowed"
+                            title="You already have an active booking for this event with another package"
+                          >
+                            Not Selected
+                          </button>
                         ) : isSoldOut ? (
                           <button
                             disabled
