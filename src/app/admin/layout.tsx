@@ -133,10 +133,6 @@ export default function AdminLayout({
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs space-y-1">
-            <span className="font-bold text-zinc-700 block">Default Admin Login:</span>
-            <span className="font-mono text-zinc-500 block">admin@bazarna.com / admin123</span>
-          </div>
 
           <div className="space-y-2 pt-2">
             <Link

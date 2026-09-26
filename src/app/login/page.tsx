@@ -98,7 +98,7 @@ function LoginForm() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@brand.com or admin@bazarna.com"
+                  placeholder="name@company.com"
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-200 text-xs font-medium focus:ring-2 focus:ring-zinc-900 transition"
                   required
                 />
