@@ -175,7 +175,15 @@ async function syncWithServer(): Promise<void> {
     if (brandsRes.ok) {
       const data = await brandsRes.json();
       if (data.success && Array.isArray(data.brands)) {
-        setStored(STORAGE_KEYS.BRANDS, data.brands);
+        const existingBrands = getStored<BrandProfile[]>(STORAGE_KEYS.BRANDS, []);
+        const merged = data.brands.map((srvBrand: BrandProfile) => {
+          const local = existingBrands.find((b) => b.id === srvBrand.id);
+          return {
+            ...srvBrand,
+            logoUrl: srvBrand.logoUrl || local?.logoUrl,
+          };
+        });
+        setStored(STORAGE_KEYS.BRANDS, merged);
       }
     }
 

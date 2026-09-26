@@ -42,6 +42,7 @@ export async function PUT(
     const dataToUpdate: any = {};
     if (body.brandName !== undefined) dataToUpdate.brandName = body.brandName;
     if (body.category !== undefined) dataToUpdate.category = body.category;
+    if (body.logoUrl !== undefined) dataToUpdate.logoUrl = body.logoUrl;
     if (body.aboutBrand !== undefined) dataToUpdate.aboutBrand = body.aboutBrand;
     if (body.products !== undefined) dataToUpdate.products = body.products;
     if (body.instagram !== undefined) dataToUpdate.instagram = body.instagram;

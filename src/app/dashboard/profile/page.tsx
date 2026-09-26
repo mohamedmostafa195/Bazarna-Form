@@ -70,7 +70,7 @@ export default function BrandProfilePage() {
 
     setIsUploadingPhoto(true);
     try {
-      const optimizedUrl = await readFileAsOptimizedDataUrl(file);
+      const optimizedUrl = await readFileAsOptimizedDataUrl(file, 400, 0.82);
       const updated = { ...formData, logoUrl: optimizedUrl };
       setFormData(updated);
       BazarnaStore.saveBrand(updated);
