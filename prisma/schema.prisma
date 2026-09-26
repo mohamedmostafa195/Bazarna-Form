@@ -13,6 +13,7 @@ model User {
   passwordHash  String
   name          String
   phone         String?
+  avatarUrl     String?
   role          String         @default("BRAND") // SUPER_ADMIN, ADMIN, OPERATIONS, FINANCE, BRAND
   brand         Brand?
   auditLogs     AuditLog[]
@@ -27,6 +28,7 @@ model Brand {
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   brandName    String
   category     String          // Girl's Fashion, Unisex Fashion, Accessories, etc.
+  logoUrl      String?
   aboutBrand   String?
   products     String?
   instagram    String?

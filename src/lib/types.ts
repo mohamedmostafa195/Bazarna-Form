@@ -7,6 +7,7 @@ export interface UserAccount {
   name: string;
   role: UserRole;
   brandId?: string;
+  avatarUrl?: string;
   createdAt: string;
 }
 
@@ -54,6 +55,7 @@ export interface BrandProfile {
   userId: string;
   brandName: string;
   category: string;
+  logoUrl?: string;
   aboutBrand?: string;
   products?: string;
   instagram?: string;
